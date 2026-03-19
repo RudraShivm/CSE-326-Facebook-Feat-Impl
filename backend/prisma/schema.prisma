@@ -1,0 +1,283 @@
+// ─────────────────────────────────────────────
+// Prisma Schema — Facebook
+// ─────────────────────────────────────────────
+// This file defines the database models (tables).
+// After editing, run:
+//   npx prisma migrate dev --name <migration-name>
+//   npx prisma generate
+// ─────────────────────────────────────────────
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────
+// Enums
+// Reference: Class Diagram — Visibility enum
+// Reference: OpenAPI spec — Visibility enum
+// ─────────────────────────────────────────────
+
+enum Visibility {
+  PUBLIC    // Anyone can see this post
+  FRIENDS   // Only friends can see
+  PRIVATE   // Only the author can see (a.k.a. "Only Me")
+
+  @@map("visibility")
+}
+
+// ─────────────────────────────────────────────
+// Enums
+// Reference: Class Diagram — ReactionType enum
+// ─────────────────────────────────────────────
+
+enum ReactionType {
+  LIKE
+  LOVE
+  HAHA
+  WOW
+  SAD
+  ANGRY
+
+  @@map("reaction_type")
+}
+
+// ─────────────────────────────────────────────
+// User Model
+// Reference: Class Diagram — "User" class
+// Reference: OpenAPI spec — UserProfile schema
+// ─────────────────────────────────────────────
+// Attributes from Class Diagram:
+//   + userId: String        → id (UUID, auto-generated)
+//   + email: String         → email (unique)
+//   + password: String      → password (bcrypt hash)
+//   - firstName: String     → firstName
+//   - lastName: String      → lastName
+//   - dateOfBirth: Date     → dateOfBirth
+//   - profilePicture: String → profilePicture (nullable URL)
+//   - bio: String           → bio (nullable)
+//   - isActive: boolean     → isActive (default true)
+//   - createdAt: DateTime   → createdAt (auto)
+//   - updatedAt: DateTime   → updatedAt (auto)
+// ─────────────────────────────────────────────
+
+model User {
+  id             String    @id @default(uuid()) @map("user_id")
+  email          String    @unique
+  password       String    // bcrypt hashed — NEVER return in API responses
+  firstName      String    @map("first_name")
+  lastName       String    @map("last_name")
+  dateOfBirth    DateTime  @map("date_of_birth") @db.Date
+  profilePicture String?   @map("profile_picture") // nullable — user may not upload
+  bio            String?   // nullable
+  isActive       Boolean   @default(true) @map("is_active")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  // ── Profile fields ──
+  coverPhoto         String? @map("cover_photo")
+  jobStatus          String? @map("job_status")
+  relationshipStatus String? @map("relationship_status")
+  instagramLink      String? @map("instagram_link")
+  linkedinLink       String? @map("linkedin_link")
+
+  // ── Privacy settings ──
+  privacyFuturePosts    String @default("PUBLIC") @map("privacy_future_posts")
+  privacyFriendRequests String @default("PUBLIC") @map("privacy_friend_requests")
+  privacyFriendsList    String @default("PUBLIC") @map("privacy_friends_list")
+
+  // ── Relations (added in later diffs) ──
+  posts      Post[]
+  comments   Comment[]
+  reactions  Reaction[]
+  savedPosts SavedPost[]
+  blockedUsers  BlockedUser[] @relation("blocker")
+  blockedBy     BlockedUser[] @relation("blocked")
+  notifications      Notification[] @relation("notifications")
+  notificationActors Notification[] @relation("notificationActor")
+
+  @@map("users") // Table name in PostgreSQL
+}
+
+// ─────────────────────────────────────────────
+// SavedPost Model — join table for saved posts
+// ─────────────────────────────────────────────
+
+model SavedPost {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  postId    String   @map("post_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+  @@map("saved_posts")
+}
+
+// ─────────────────────────────────────────────
+// BlockedUser Model — blocking relationships
+// ─────────────────────────────────────────────
+
+model BlockedUser {
+  id        String   @id @default(uuid())
+  blockerId String   @map("blocker_id")
+  blockedId String   @map("blocked_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  blocker User @relation("blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked User @relation("blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedId])
+  @@map("blocked_users")
+}
+
+// ─────────────────────────────────────────────
+// Post Model
+// Reference: Class Diagram — "Post" class
+// Reference: OpenAPI spec — Post schema
+// ─────────────────────────────────────────────
+// Attributes from Class Diagram:
+//   + postId: String         → id (UUID)
+//   + content: String        → content (text body)
+//   + imageUrl: String       → imageUrl (nullable, from Supabase)
+//   + videoUrl: String       → videoUrl (nullable, from Supabase)
+//   + visibility: Visibility → visibility (PUBLIC/FRIENDS/PRIVATE)
+//   + likeCount: int         → likeCount (denormalized counter)
+//   + commentCount: int      → commentCount (denormalized counter)
+//   + shareCount: int        → shareCount (denormalized counter)
+//   + createdAt: DateTime    → createdAt (auto)
+//   + updatedAt: DateTime    → updatedAt (auto)
+// ─────────────────────────────────────────────
+
+model Post {
+  id           String     @id @default(uuid()) @map("post_id")
+  content      String
+  imageUrl     String?    @map("image_url")
+  videoUrl     String?    @map("video_url")
+  visibility   Visibility @default(PUBLIC)
+  likeCount    Int        @default(0) @map("like_count")
+  commentCount Int        @default(0) @map("comment_count")
+  shareCount   Int        @default(0) @map("share_count")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+
+  // ── Relations ──
+  authorId     String     @map("author_id")
+  author       User       @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  comments     Comment[]
+  reactions    Reaction[]
+  savedBy      SavedPost[]
+  shares       Post[]       @relation("SharedPost")
+
+  // ── Share Relation ──
+  sharedPostId String?      @map("shared_post_id")
+  sharedPost   Post?        @relation("SharedPost", fields: [sharedPostId], references: [id], onDelete: SetNull)
+
+  @@index([authorId])
+  @@index([createdAt])
+  @@map("posts")
+}
+
+// ─────────────────────────────────────────────
+// Comment Model
+// Reference: Class Diagram — "Comment" class
+// Reference: OpenAPI spec — Comment schema
+// ─────────────────────────────────────────────
+// Attributes from Class Diagram:
+//   + commentId: String     → id (UUID)
+//   + content: String       → content
+//   + createdAt: DateTime   → createdAt
+//   + updatedAt: DateTime   → updatedAt
+// Relations:
+//   Comment → Post (many-to-one)
+//   Comment → User (many-to-one, author)
+// ─────────────────────────────────────────────
+
+model Comment {
+  id        String   @id @default(uuid()) @map("comment_id")
+  content   String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // ── Relations ──
+  authorId  String   @map("author_id")
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  postId    String   @map("post_id")
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  reactions  Reaction[]
+
+  @@index([postId])
+  @@index([authorId])
+  @@map("comments")
+}
+
+// ─────────────────────────────────────────────
+// Reaction Model
+// Reference: Class Diagram — "Reaction" class
+// Reference: OpenAPI spec — Reaction schema
+// ─────────────────────────────────────────────
+// Attributes from Class Diagram:
+//   + reactionId: String    → id (UUID)
+//   + type: ReactionType    → type (LIKE/LOVE/etc)
+//   + createdAt: DateTime   → createdAt
+// Relations:
+//   Reaction → User (many-to-one, creator)
+//   Reaction → Post (many-to-one, nullable — if reacting to post)
+//   Reaction → Comment (many-to-one, nullable — if reacting to comment)
+// Constraint: A user can only react once to a specific post or comment.
+// ─────────────────────────────────────────────
+
+model Reaction {
+  id        String       @id @default(uuid()) @map("reaction_id")
+  type      ReactionType
+  createdAt DateTime     @default(now()) @map("created_at")
+
+  // ── Relations ──
+  userId    String       @map("user_id")
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Polymorphic-like relation: reacts to either a Post OR a Comment
+  postId    String?      @map("post_id")
+  post      Post?        @relation(fields: [postId], references: [id], onDelete: Cascade)
+  
+  commentId String?      @map("comment_id")
+  comment   Comment?     @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  // Constraints: A user can only react once per post/comment
+  @@unique([userId, postId])
+  @@unique([userId, commentId])
+  @@index([postId])
+  @@index([commentId])
+  @@map("reactions")
+}
+
+// ─────────────────────────────────────────────
+// Notification Model
+// ─────────────────────────────────────────────
+
+model Notification {
+  id        String   @id @default(uuid()) @map("notification_id")
+  type      String   // LIKE, COMMENT, REACTION, etc.
+  message   String
+  entityId  String   @map("entity_id") // postId or commentId
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // ── Relations ──
+  userId    String   @map("user_id")  // recipient
+  user      User     @relation("notifications", fields: [userId], references: [id], onDelete: Cascade)
+
+  actorId   String   @map("actor_id") // who triggered it
+  actor     User     @relation("notificationActor", fields: [actorId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("notifications")
+}
