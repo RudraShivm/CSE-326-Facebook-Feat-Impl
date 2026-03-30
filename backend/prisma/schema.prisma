@@ -86,9 +86,9 @@ model User {
   linkedinLink       String? @map("linkedin_link")
 
   // ── Privacy settings ──
-  privacyFuturePosts    String @default("PUBLIC") @map("privacy_future_posts")
-  privacyFriendRequests String @default("PUBLIC") @map("privacy_friend_requests")
-  privacyFriendsList    String @default("PUBLIC") @map("privacy_friends_list")
+  privacyFuturePosts    Visibility @default(PUBLIC) @map("privacy_future_posts")
+  privacyFriendRequests Visibility @default(PUBLIC) @map("privacy_friend_requests")
+  privacyFriendsList    Visibility @default(PUBLIC) @map("privacy_friends_list")
 
   // ── Relations (added in later diffs) ──
   posts      Post[]

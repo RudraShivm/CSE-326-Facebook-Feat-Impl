@@ -17,6 +17,10 @@ import { errorHandler } from "./middleware/error.middleware";
 
 const app = express();
 
+// This app runs behind Nginx in production on the VM.
+// Trust a single reverse proxy so rate limiting and IP detection work correctly.
+app.set("trust proxy", 1);
+
 // ─── SECURITY ───────────────────────────────────────────────
 // helmet() sets various HTTP headers to protect the app
 app.use(helmet());
