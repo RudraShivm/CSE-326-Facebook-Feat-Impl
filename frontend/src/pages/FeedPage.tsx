@@ -4,6 +4,7 @@ import PostCard from "../components/PostCard";
 import CreatePostModal from "../components/CreatePostModal";
 import GlobalMenu from "../components/GlobalMenu";
 import { Post } from "../api/posts";
+import { getApiErrorMessage } from "../api/error";
 import { getUnreadCount } from "../api/notifications";
 import apiClient from "../api/client";
 import { FiSearch, FiBell, FiLock, FiUnlock } from "react-icons/fi";
@@ -24,6 +25,7 @@ export default function FeedPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showGlobalMenu, setShowGlobalMenu] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Fetch posts on mount or pagination
   const fetchPosts = useCallback(async (pageNum: number, isInitial = false) => {
@@ -31,6 +33,7 @@ export default function FeedPage() {
     else setIsFetchingMore(true);
 
     try {
+      if (isInitial) setLoadError(null);
       const res = await apiClient.get(`/feed?page=${pageNum}&limit=5&seed=${seedRef.current}`);
       const newPosts = res.data.posts || [];
       
@@ -38,6 +41,9 @@ export default function FeedPage() {
       setHasMore(res.data.hasMore);
     } catch (error) {
       console.error("Failed to fetch posts:", error);
+      if (isInitial) {
+        setLoadError(getApiErrorMessage(error, "Failed to load your feed. Please try again."));
+      }
     } finally {
       if (isInitial) setIsLoading(false);
       else setIsFetchingMore(false);
@@ -125,7 +131,7 @@ export default function FeedPage() {
           </div>
         ) : posts.length === 0 ? (
           <div className="feed-empty card">
-            <p>No posts yet. Create your first post!</p>
+            <p>{loadError || "No posts yet. Create your first post!"}</p>
           </div>
         ) : (
           <div className="feed-list">

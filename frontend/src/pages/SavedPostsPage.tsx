@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { getApiErrorMessage } from "../api/error";
 import { getSavedPosts } from "../api/users";
 import { Post } from "../api/posts";
 import PostCard from "../components/PostCard";
@@ -12,6 +13,7 @@ export default function SavedPostsPage() {
   const navigate = useNavigate();
   const [posts, setPosts] = useState<Post[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Global Menu state
   const [showGlobalMenu, setShowGlobalMenu] = useState(false);
@@ -20,6 +22,7 @@ export default function SavedPostsPage() {
     if (!user) return;
     try {
       setIsLoading(true);
+      setLoadError(null);
       const data = await getSavedPosts(user.userId);
       // The returned items contain post data; map them with isSaved=true
       const mappedPosts = (data.items || []).map((item: any) => ({
@@ -29,6 +32,7 @@ export default function SavedPostsPage() {
       setPosts(mappedPosts);
     } catch (err) {
       console.error("Failed to fetch saved posts:", err);
+      setLoadError(getApiErrorMessage(err, "Failed to load your saved posts. Please try again."));
     } finally {
       setIsLoading(false);
     }
@@ -83,7 +87,7 @@ export default function SavedPostsPage() {
           </div>
         ) : posts.length === 0 ? (
           <div className="feed-empty card">
-            <p>No saved posts yet. Save posts from the ⋮ menu on any post.</p>
+            <p>{loadError || "No saved posts yet. Save posts from the ⋮ menu on any post."}</p>
           </div>
         ) : (
           <div className="feed-list">

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { getApiErrorMessage } from "../api/error";
 import { getNotifications, markAsRead, markAllAsRead, NotificationItem } from "../api/notifications";
 import GlobalMenu from "../components/GlobalMenu";
 import { FiBell, FiCheckCircle } from "react-icons/fi";
@@ -36,17 +37,28 @@ export default function NotificationPage() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [showGlobalMenu, setShowGlobalMenu] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [status, setStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   const fetchNotifications = useCallback(async (pageNum: number = 1, append: boolean = false) => {
     if (!user) return;
     setIsLoading(true);
     try {
+      if (!append) setLoadError(null);
       const res = await getNotifications(pageNum, 20);
       setNotifications(prev => append ? [...prev, ...res.notifications] : res.notifications);
       setHasMore(res.hasMore);
       setPage(pageNum);
     } catch (err) {
       console.error("Failed to fetch notifications:", err);
+      if (!append) {
+        setLoadError(getApiErrorMessage(err, "Failed to load notifications. Please try again."));
+      } else {
+        setStatus({
+          type: "error",
+          message: getApiErrorMessage(err, "Failed to load more notifications. Please try again."),
+        });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -58,20 +70,31 @@ export default function NotificationPage() {
 
   const handleMarkAllRead = async () => {
     try {
+      setStatus(null);
       await markAllAsRead();
       setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+      setStatus({ type: "success", message: "All notifications marked as read." });
     } catch (err) {
       console.error("Failed to mark all read:", err);
+      setStatus({
+        type: "error",
+        message: getApiErrorMessage(err, "Failed to mark all notifications as read."),
+      });
     }
   };
 
   const handleClick = async (n: NotificationItem) => {
     if (!n.isRead) {
       try {
+        setStatus(null);
         await markAsRead(n.id);
         setNotifications(prev => prev.map(notif => notif.id === n.id ? { ...notif, isRead: true } : notif));
       } catch (err) {
         console.error("Failed to mark as read:", err);
+        setStatus({
+          type: "error",
+          message: getApiErrorMessage(err, "Failed to mark this notification as read."),
+        });
       }
     }
     // Navigate to the relevant post or profile
@@ -124,6 +147,11 @@ export default function NotificationPage() {
             </button>
           )}
         </div>
+        {status && (
+          <p className={`status-banner status-banner--${status.type}`}>
+            {status.message}
+          </p>
+        )}
 
         {isLoading && notifications.length === 0 ? (
           <div className="skeleton-card card">
@@ -133,7 +161,7 @@ export default function NotificationPage() {
         ) : notifications.length === 0 ? (
           <div className="notification-empty">
             <FiBell size={48} style={{ opacity: 0.3 }} />
-            <p>No notifications yet</p>
+            <p>{loadError || "No notifications yet"}</p>
           </div>
         ) : (
           <div className="notification-groups">

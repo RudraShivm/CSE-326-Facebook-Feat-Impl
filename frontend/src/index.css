@@ -1966,6 +1966,27 @@ img {
   font-weight: 500;
 }
 
+.status-banner {
+  text-align: center;
+  margin: var(--space-sm) 0 var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.status-banner--success {
+  background: #DCFCE7;
+  color: #166534;
+  border: 1px solid #BBF7D0;
+}
+
+.status-banner--error {
+  background: #FEE2E2;
+  color: var(--color-error);
+  border: 1px solid #FECACA;
+}
+
 .upload-hint {
   font-size: 0.75rem;
   color: rgba(0,0,0,0.5);

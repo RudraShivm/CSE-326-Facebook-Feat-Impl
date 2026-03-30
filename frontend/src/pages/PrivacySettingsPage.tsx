@@ -10,6 +10,7 @@ import {
   UserProfile,
   BlockedUser,
 } from "../api/users";
+import { getApiErrorMessage } from "../api/error";
 import GlobalMenu from "../components/GlobalMenu";
 import { FiSearch, FiBell, FiRefreshCw, FiChevronRight, FiPlus } from "react-icons/fi";
 
@@ -28,6 +29,7 @@ export default function PrivacySettingsPage() {
   const [blockedUsers, setBlockedUsers] = useState<BlockedUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [blockInput, setBlockInput] = useState("");
+  const [status, setStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   // Global Menu state
   const [showGlobalMenu, setShowGlobalMenu] = useState(false);
@@ -37,6 +39,7 @@ export default function PrivacySettingsPage() {
     (async () => {
       try {
         setIsLoading(true);
+        setStatus(null);
         const [profileData, blocked] = await Promise.all([
           getProfile(user.userId),
           getBlockedUsers(user.userId),
@@ -45,6 +48,10 @@ export default function PrivacySettingsPage() {
         setBlockedUsers(blocked);
       } catch (err) {
         console.error("Failed to fetch privacy data:", err);
+        setStatus({
+          type: "error",
+          message: getApiErrorMessage(err, "Failed to load privacy settings. Please refresh and try again."),
+        });
       } finally {
         setIsLoading(false);
       }
@@ -54,33 +61,51 @@ export default function PrivacySettingsPage() {
   const handlePrivacyChange = async (field: string, value: string) => {
     if (!user || !profile) return;
     try {
+      setStatus(null);
       const updated = await updateProfile(user.userId, { [field]: value });
       setProfile(updated);
+      setStatus({ type: "success", message: "Privacy settings updated." });
     } catch (err) {
       console.error("Failed to update privacy:", err);
+      setStatus({
+        type: "error",
+        message: getApiErrorMessage(err, "Failed to update privacy settings. Please try again."),
+      });
     }
   };
 
   const handleUnblock = async (blockedId: string) => {
     if (!user) return;
     try {
+      setStatus(null);
       await unblockUser(user.userId, blockedId);
       setBlockedUsers((prev) => prev.filter((b) => b.blockedId !== blockedId));
+      setStatus({ type: "success", message: "User unblocked." });
     } catch (err) {
       console.error("Failed to unblock user:", err);
+      setStatus({
+        type: "error",
+        message: getApiErrorMessage(err, "Failed to unblock user. Please try again."),
+      });
     }
   };
 
   const handleBlock = async () => {
     if (!user || !blockInput.trim()) return;
     try {
+      setStatus(null);
       await blockUser(user.userId, blockInput.trim());
       // Refresh blocked users
       const blocked = await getBlockedUsers(user.userId);
       setBlockedUsers(blocked);
       setBlockInput("");
+      setStatus({ type: "success", message: "User added to blocked list." });
     } catch (err) {
       console.error("Failed to block user:", err);
+      setStatus({
+        type: "error",
+        message: getApiErrorMessage(err, "Failed to block user. Please try again."),
+      });
     }
   };
 
@@ -113,6 +138,11 @@ export default function PrivacySettingsPage() {
       {/* ── Content ── */}
       <main className="settings-content">
         <h2 className="settings-page-title">Privacy Settings</h2>
+        {status && (
+          <p className={`status-banner status-banner--${status.type}`}>
+            {status.message}
+          </p>
+        )}
 
         {isLoading ? (
           <div className="skeleton-card card">

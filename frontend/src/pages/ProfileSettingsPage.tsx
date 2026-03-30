@@ -2,12 +2,14 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { getProfile, updateProfile, UserProfile, UpdateProfileInput } from "../api/users";
+import { getApiErrorMessage } from "../api/error";
 import { uploadMedia } from "../api/storage";
 import GlobalMenu from "../components/GlobalMenu";
 import { FiSearch, FiBell, FiPlus, FiCamera, FiLoader } from "react-icons/fi";
 
 const JOB_OPTIONS = ["Unemployed", "Student", "Employed", "Freelancer", "Self-employed", "Other"];
 const RELATIONSHIP_OPTIONS = ["Single", "In a relationship", "Married", "Complicated", "Other"];
+const MAX_UPLOAD_SIZE_BYTES = 10 * 1024 * 1024;
 
 // ── Validation helpers ──
 const INSTAGRAM_REGEX = /^(https?:\/\/)?(www\.)?instagram\.com\/[a-zA-Z0-9._]+\/?$/;
@@ -36,7 +38,7 @@ export default function ProfileSettingsPage() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [saveMsg, setSaveMsg] = useState<string | null>(null);
+  const [status, setStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   // Global Menu state
   const [showGlobalMenu, setShowGlobalMenu] = useState(false);
@@ -63,6 +65,7 @@ export default function ProfileSettingsPage() {
     (async () => {
       try {
         setIsLoading(true);
+        setStatus(null);
         const data = await getProfile(user.userId);
         setProfile(data);
         setBio(data.bio || "");
@@ -72,6 +75,10 @@ export default function ProfileSettingsPage() {
         setLinkedinLink(data.linkedinLink || "");
       } catch (err) {
         console.error("Failed to fetch profile:", err);
+        setStatus({
+          type: "error",
+          message: getApiErrorMessage(err, "Failed to load your profile settings. Please refresh and try again."),
+        });
       } finally {
         setIsLoading(false);
       }
@@ -82,14 +89,28 @@ export default function ProfileSettingsPage() {
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
+    if (file.size > MAX_UPLOAD_SIZE_BYTES) {
+      setStatus({
+        type: "error",
+        message: "Profile picture must be 10 MB or smaller.",
+      });
+      if (avatarInputRef.current) avatarInputRef.current.value = "";
+      return;
+    }
     setIsUploadingAvatar(true);
+    setStatus(null);
     try {
       const url = await uploadMedia(file);
       const updated = await updateProfile(user.userId, { profilePicture: url });
       setProfile(updated);
       updateUserContext({ profilePicture: url });
+      setStatus({ type: "success", message: "Profile picture updated." });
     } catch (err) {
       console.error("Failed to upload profile picture:", err);
+      setStatus({
+        type: "error",
+        message: getApiErrorMessage(err, "Failed to upload profile picture. Please try again."),
+      });
     } finally {
       setIsUploadingAvatar(false);
       if (avatarInputRef.current) avatarInputRef.current.value = "";
@@ -99,13 +120,27 @@ export default function ProfileSettingsPage() {
   const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
+    if (file.size > MAX_UPLOAD_SIZE_BYTES) {
+      setStatus({
+        type: "error",
+        message: "Cover photo must be 10 MB or smaller.",
+      });
+      if (coverInputRef.current) coverInputRef.current.value = "";
+      return;
+    }
     setIsUploadingCover(true);
+    setStatus(null);
     try {
       const url = await uploadMedia(file);
       const updated = await updateProfile(user.userId, { coverPhoto: url });
       setProfile(updated);
+      setStatus({ type: "success", message: "Cover photo updated." });
     } catch (err) {
       console.error("Failed to upload cover photo:", err);
+      setStatus({
+        type: "error",
+        message: getApiErrorMessage(err, "Failed to upload cover photo. Please try again."),
+      });
     } finally {
       setIsUploadingCover(false);
       if (coverInputRef.current) coverInputRef.current.value = "";
@@ -123,7 +158,7 @@ export default function ProfileSettingsPage() {
 
     if (!user) return;
     setIsSaving(true);
-    setSaveMsg(null);
+    setStatus(null);
     try {
       const formattedBio = bio ? bio.replace(/[\r\n]{2,}/g, '\n') : null;
       const input: UpdateProfileInput = {
@@ -135,11 +170,13 @@ export default function ProfileSettingsPage() {
       };
       const updated = await updateProfile(user.userId, input);
       setProfile(updated);
-      setSaveMsg("Changes saved!");
-      setTimeout(() => setSaveMsg(null), 3000);
+      setStatus({ type: "success", message: "Changes saved!" });
     } catch (err) {
       console.error("Failed to save profile:", err);
-      setSaveMsg("Failed to save. Please try again.");
+      setStatus({
+        type: "error",
+        message: getApiErrorMessage(err, "Failed to save profile. Please try again."),
+      });
     } finally {
       setIsSaving(false);
     }
@@ -174,6 +211,11 @@ export default function ProfileSettingsPage() {
       {/* ── Content ── */}
       <main className="settings-content">
         <h2 className="settings-page-title">Profile Settings</h2>
+        {status && (
+          <p className={`status-banner status-banner--${status.type}`}>
+            {status.message}
+          </p>
+        )}
 
         {isLoading ? (
           <div className="skeleton-card card">
@@ -325,7 +367,6 @@ export default function ProfileSettingsPage() {
             >
               {isSaving ? "Saving..." : "Save Changes"}
             </button>
-            {saveMsg && <p className="settings-save-msg">{saveMsg}</p>}
           </div>
         )}
       </main>

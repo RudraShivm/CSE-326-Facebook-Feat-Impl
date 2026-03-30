@@ -4,6 +4,7 @@ node_modules/
 # Build output
 backend/dist/
 frontend/dist/
+*.tsbuildinfo
 
 # Environment variables (NEVER commit these)
 .env

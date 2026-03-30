@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getProfile, getUserPosts, UserProfile } from "../api/users";
+import { getApiErrorMessage } from "../api/error";
 import { Post } from "../api/posts";
 import PostCard from "../components/PostCard";
 import GlobalMenu from "../components/GlobalMenu";
@@ -21,6 +22,8 @@ export default function ProfilePage() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [postsLoading, setPostsLoading] = useState(true);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [postsError, setPostsError] = useState<string | null>(null);
 
   // Global Menu state
   const [showGlobalMenu, setShowGlobalMenu] = useState(false);
@@ -29,10 +32,12 @@ export default function ProfilePage() {
     if (!userId) return;
     try {
       setIsLoading(true);
+      setProfileError(null);
       const data = await getProfile(userId);
       setProfile(data);
     } catch (err) {
       console.error("Failed to fetch profile:", err);
+      setProfileError(getApiErrorMessage(err, "Failed to load this profile. Please try again."));
     } finally {
       setIsLoading(false);
     }
@@ -42,10 +47,12 @@ export default function ProfilePage() {
     if (!userId) return;
     try {
       setPostsLoading(true);
+      setPostsError(null);
       const data = await getUserPosts(userId);
       setPosts(data.posts || []);
     } catch (err) {
       console.error("Failed to fetch user posts:", err);
+      setPostsError(getApiErrorMessage(err, "Failed to load this user's posts. Please try again."));
     } finally {
       setPostsLoading(false);
     }
@@ -87,7 +94,7 @@ export default function ProfilePage() {
           </div>
         </header>
         <main className="profile-not-found card">
-          <p>User not found.</p>
+          <p>{profileError || "User not found."}</p>
         </main>
       </div>
     );
@@ -180,7 +187,7 @@ export default function ProfilePage() {
             </div>
           ) : posts.length === 0 ? (
             <div className="feed-empty card">
-              <p>No posts yet.</p>
+              <p>{postsError || "No posts yet."}</p>
             </div>
           ) : (
             <div className="feed-list">

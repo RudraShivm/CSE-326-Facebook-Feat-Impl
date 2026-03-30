@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getPost, Post } from "../api/posts";
+import { getApiErrorMessage } from "../api/error";
 import PostCard from "../components/PostCard";
 import { useAuth } from "../contexts/AuthContext";
 
@@ -10,15 +11,18 @@ export default function SinglePostPage() {
   const { user } = useAuth();
   const [post, setPost] = useState<Post | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!postId) return;
     getPost(postId)
       .then((data: Post) => {
+        setError(null);
         setPost(data);
       })
-      .catch((err: any) => {
+      .catch((err: unknown) => {
         console.error("Failed to load post", err);
+        setError(getApiErrorMessage(err, "Post not found or unavailable."));
       })
       .finally(() => setLoading(false));
   }, [postId]);
@@ -57,7 +61,7 @@ export default function SinglePostPage() {
           </div>
         ) : !post ? (
           <div className="card" style={{ padding: "2rem", textAlign: "center", color: "var(--text-secondary)" }}>
-            Post not found or unavailable.
+            {error || "Post not found or unavailable."}
           </div>
         ) : (
           <div className="single-post-wrapper">
