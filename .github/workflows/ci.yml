@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: 9.Facebook-Feat-Impl/backend
+        working-directory: backend
     services:
       postgres:
         image: postgres:16-alpine
@@ -43,7 +43,7 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: 9.Facebook-Feat-Impl/backend/package-lock.json
+          cache-dependency-path: backend/package-lock.json
 
       - name: Install backend dependencies
         run: npm ci
@@ -66,7 +66,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: 9.Facebook-Feat-Impl/frontend
+        working-directory: frontend
 
     steps:
       - name: Checkout source code
@@ -77,7 +77,7 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: 9.Facebook-Feat-Impl/frontend/package-lock.json
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Install frontend dependencies
         run: npm ci
