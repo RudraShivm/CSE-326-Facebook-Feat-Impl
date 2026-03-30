@@ -29,7 +29,7 @@ jobs:
           script: |
             set -eu
 
-            APP_DIR="${VM_APP_DIR:-$HOME/CSE-326-Information-System-Design/9.Facebook-Feat-Impl}"
+            APP_DIR="${VM_APP_DIR:-$HOME/CSE-326-Facebook-Feat-Impl}"
 
             if [ ! -d "$APP_DIR/.git" ]; then
               echo "Expected git repository at $APP_DIR but it was not found."
