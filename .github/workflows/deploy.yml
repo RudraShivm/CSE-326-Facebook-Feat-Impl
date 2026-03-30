@@ -7,7 +7,7 @@ on:
     types:
       - completed
     branches:
-      - main
+      - master
   workflow_dispatch:
 
 jobs:
@@ -37,8 +37,8 @@ jobs:
             fi
 
             cd "$APP_DIR"
-            git fetch origin main
-            git pull --ff-only origin main
+            git fetch origin master
+            git pull --ff-only origin master
 
             if [ -f ./.vm-secrets ]; then
               . ./.vm-secrets
