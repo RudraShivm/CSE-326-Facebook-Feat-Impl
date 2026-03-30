@@ -24,3 +24,6 @@ backend/prisma/migrations/**/migration_lock.toml
 
 # Docker volumes
 pgdata/
+
+# Guide markdowns
+*GUIDE.md
