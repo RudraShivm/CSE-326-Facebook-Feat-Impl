@@ -269,16 +269,19 @@ SUPABASE_KEY="your-service-role-key"
 ```bash
 docker-compose up -d
 ```
-This starts **PostgreSQL** on port `5433` and **Redis** on port `6380`.
+This starts **PostgreSQL** on port `5432` and **Redis** on port `6379`.
+It also auto-creates a separate `facebook_db_test` database for local Jest runs.
 
 ### 3. Run Backend
 
 ```bash
 cd backend
 npm install
-npx prisma migrate dev    # Create tables
 npm run dev                # Start dev server (port 8080)
 ```
+
+`npm run dev` automatically applies any already-committed Prisma migrations before starting the API.
+Use `npx prisma migrate dev --name <change>` only when you intentionally change `schema.prisma` and need to create a new migration.
 
 ### 4. Run Frontend
 
@@ -332,6 +335,8 @@ cd backend
 npm test    # Runs jest --runInBand --forceExit
 ```
 
+`npm test` automatically applies committed Prisma migrations to `facebook_db_test` before running Jest.
+
 ### Test Coverage
 
 | Suite | Tests | Coverage |
@@ -342,7 +347,7 @@ npm test    # Runs jest --runInBand --forceExit
 | **Reactions** | Toggle, switch type, remove, counts | 6 tests |
 | **Feed** | Algorithm, privacy filtering, cursor pagination | 4 tests |
 
-> **Note:** Tests require a running PostgreSQL instance (the test setup uses `localhost:5432` by default). Run `docker-compose up -d` first.
+> **Note:** Tests require the local Docker services to be running. `docker-compose up -d` starts PostgreSQL on `localhost:5432`, Redis on `localhost:6379`, and auto-creates the `facebook_db_test` database used by Jest.
 
 ---
 
