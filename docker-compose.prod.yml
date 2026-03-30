@@ -4,20 +4,18 @@ services:
   # PostgreSQL Database
   db:
     image: postgres:16-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-facebook}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-securepassword}
       POSTGRES_DB: ${POSTGRES_DB:-facebook_db}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
 
   # Redis Cache
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
+    restart: unless-stopped
     volumes:
       - redis_data:/data
 
@@ -26,8 +24,7 @@ services:
     build: 
       context: .
       dockerfile: Dockerfile.backend
-    ports:
-      - "8080:8080"
+    restart: unless-stopped
     env_file: ./backend/.env
     depends_on:
       - db
@@ -38,6 +35,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.frontend
+    restart: unless-stopped
     ports:
       - "80:80"
     depends_on:
