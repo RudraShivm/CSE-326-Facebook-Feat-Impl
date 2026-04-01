@@ -41,6 +41,7 @@ export interface CreatePostInput {
   videoUrl?: string;
   visibility?: "PUBLIC" | "FRIENDS" | "PRIVATE";
   sharedPostId?: string;
+  sourcePostId?: string;
 }
 
 export async function createPost(data: CreatePostInput): Promise<Post> {

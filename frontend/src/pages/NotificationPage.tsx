@@ -98,7 +98,7 @@ export default function NotificationPage() {
       }
     }
     // Navigate to the relevant post or profile
-    if (n.type === "LIKE" || n.type === "COMMENT") {
+    if (n.type === "LIKE" || n.type === "COMMENT" || n.type === "SHARE") {
       navigate(`/post/${n.entityId}`);
     } else if (n.type === "FRIEND_REQUEST" || n.type === "FRIEND_ACCEPT") {
       navigate(`/profile/${n.actor.id}`);

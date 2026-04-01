@@ -10,6 +10,7 @@ const createPostSchema = z.object({
   videoUrl: z.string().url().optional(),
   visibility: z.enum(["PUBLIC", "FRIENDS", "PRIVATE"]).optional(),
   sharedPostId: z.string().uuid().optional(),
+  sourcePostId: z.string().uuid().optional(),
 }).refine(
   (data) => (data.content && data.content.trim().length > 0) || data.imageUrl || data.videoUrl || data.sharedPostId,
   { message: "Post must have content, media, or a shared post.", path: ["content"] }
