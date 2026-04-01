@@ -205,15 +205,24 @@ export default function PostCard({ post, onCommentClick, onPostDeleted, onPostUp
         )}
       </div>
 
-      {/* ── Shared Post Embed ── */}
       {post.sharedPost && (
-        <div className="shared-post-embed" style={{ border: "1px solid var(--border-color)", borderLeft: "3px solid var(--primary-color)", margin: "0 16px 16px", padding: "12px", borderRadius: "8px", cursor: "pointer" }} onClick={() => navigate(`/profile/${post.sharedPost!.author.id}`)}>
+        <div className="shared-post-embed" style={{ borderTop: "1px solid var(--color-border)", boxShadow: "0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.05)", margin: "0 var(--space-md) var(--space-md)", padding: "var(--space-md)", borderRadius: "var(--radius-md)", cursor: "pointer", background: "var(--color-background)" }} onClick={() => navigate(`/post/${post.sharedPost!.id}`)}>
           <div className="shared-post-header" style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "8px" }}>
-            <img src={post.sharedPost.author.profilePicture || "https://placehold.co/40x40"} style={{ width: "24px", height: "24px", borderRadius: "50%", objectFit: "cover", backgroundColor: "var(--bg-secondary)" }} />
-            <span style={{ fontWeight: 600, fontSize: "0.9rem", color: "var(--text-primary)" }}>{post.sharedPost.author.firstName} {post.sharedPost.author.lastName}</span>
-            <span style={{ color: "var(--text-secondary)", fontSize: "0.8rem" }}>· {timeAgo(post.sharedPost.createdAt)}</span>
+            <img 
+              src={post.sharedPost.author.profilePicture || "https://placehold.co/40x40"} 
+              style={{ width: "24px", height: "24px", borderRadius: "50%", objectFit: "cover", backgroundColor: "var(--bg-secondary)", cursor: "pointer" }} 
+              onClick={(e) => { e.stopPropagation(); navigate(`/profile/${post.sharedPost!.author.id}`); }}
+            />
+            <span 
+              className="post-author-name"
+              style={{ fontSize: "0.9rem" }}
+              onClick={(e) => { e.stopPropagation(); navigate(`/profile/${post.sharedPost!.author.id}`); }}
+            >
+              {post.sharedPost.author.firstName} {post.sharedPost.author.lastName}
+            </span>
+            <span style={{ color: "var(--color-text-secondary)", fontSize: "0.8rem" }}>· {timeAgo(post.sharedPost.createdAt)}</span>
           </div>
-          <p style={{ fontSize: "0.95rem", margin: 0, whiteSpace: "pre-wrap" }}>{post.sharedPost.content}</p>
+          <p style={{ fontSize: "0.95rem", margin: 0, whiteSpace: "pre-wrap", color: "var(--color-text)" }}>{post.sharedPost.content}</p>
           {post.sharedPost.imageUrl && <img src={post.sharedPost.imageUrl} alt="Shared post image" style={{ width: "100%", borderRadius: "8px", marginTop: "8px" }} />}
           {post.sharedPost.videoUrl && <video src={post.sharedPost.videoUrl} controls style={{ width: "100%", borderRadius: "8px", marginTop: "8px" }} />}
         </div>

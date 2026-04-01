@@ -50,6 +50,7 @@ export async function generateFeed(userId: string, cursor?: string, limit: numbe
       ) * (0.8 + (ABS(hashtext("post_id"::text || $3::text)) % 100) / 250.0) as score
     FROM "posts"
     WHERE ("visibility" = 'PUBLIC'::"visibility" OR "author_id" = $1)
+      AND "created_at" <= ($2)::timestamptz
     ORDER BY score DESC, "post_id" DESC
     OFFSET $4
     LIMIT $5`,
