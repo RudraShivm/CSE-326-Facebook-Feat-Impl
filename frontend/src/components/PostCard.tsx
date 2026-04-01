@@ -46,11 +46,13 @@ export default function PostCard({ post, onCommentClick, onPostDeleted, onPostUp
   const [showMenu, setShowMenu] = useState(false);
   const [isReacted, setIsReacted] = useState((post as any).hasReacted || false);
   const [likeCount, setLikeCount] = useState(post.likeCount);
+  const [shareCount, setShareCount] = useState(post.shareCount);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isSaved, setIsSaved] = useState(!!post.isSaved);
   const [showEditModal, setShowEditModal] = useState(false);
   const [currentContent, setCurrentContent] = useState(post.content);
   const [currentVisibility, setCurrentVisibility] = useState(post.visibility);
+  const [shareToast, setShareToast] = useState<{ visible: boolean; type: "success" | "error"; message: string }>({ visible: false, type: "success", message: "" });
   const { user } = useAuth();
   const navigate = useNavigate();
   
@@ -122,12 +124,14 @@ export default function PostCard({ post, onCommentClick, onPostDeleted, onPostUp
     if (!user) return;
     try {
       const idToShare = post.sharedPostId || post.id;
-      await createPost({ content: "", sharedPostId: idToShare, visibility: "PUBLIC" });
-      alert("Post shared successfully!");
+      await createPost({ content: "", sharedPostId: idToShare, sourcePostId: post.id, visibility: "PUBLIC" });
+      setShareCount(prev => prev + 1);
+      setShareToast({ visible: true, type: "success", message: "Post shared successfully!" });
     } catch (e) {
       console.error(e);
-      alert("Failed to share post.");
+      setShareToast({ visible: true, type: "error", message: "Failed to share post." });
     }
+    setTimeout(() => setShareToast({ visible: false, type: "success", message: "" }), 3000);
   };
 
   return (
@@ -205,7 +209,8 @@ export default function PostCard({ post, onCommentClick, onPostDeleted, onPostUp
              <span style={{ color: "var(--text-secondary)", fontSize: "0.8rem" }}>· {timeAgo(post.sharedPost.createdAt)}</span>
           </div>
           <p style={{ fontSize: "0.95rem", margin: 0, whiteSpace: "pre-wrap" }}>{post.sharedPost.content}</p>
-          {post.sharedPost.imageUrl && <img src={post.sharedPost.imageUrl} style={{ width: "100%", borderRadius: "8px", marginTop: "8px" }} />}
+          {post.sharedPost.imageUrl && <img src={post.sharedPost.imageUrl} alt="Shared post image" style={{ width: "100%", borderRadius: "8px", marginTop: "8px" }} />}
+          {post.sharedPost.videoUrl && <video src={post.sharedPost.videoUrl} controls style={{ width: "100%", borderRadius: "8px", marginTop: "8px" }} />}
         </div>
       )}
 
@@ -225,7 +230,7 @@ export default function PostCard({ post, onCommentClick, onPostDeleted, onPostUp
       <div className="post-actions">
         <button className="post-action-btn" id={`share-${post.id}`} onClick={handleShare}>
           <FiShare2 size={18} />
-          <span>{post.shareCount || 0}</span>
+          <span>{shareCount || 0}</span>
         </button>
         <button
           className={`post-action-btn post-action-heart ${isReacted ? "reacted" : ""}`}
@@ -247,6 +252,13 @@ export default function PostCard({ post, onCommentClick, onPostDeleted, onPostUp
           <span>{post.commentCount}</span>
         </button>
       </div>
+
+      {/* ── Share Toast ── */}
+      {shareToast.visible && (
+        <div className={`share-toast share-toast--${shareToast.type}`}>
+          {shareToast.message}
+        </div>
+      )}
 
       {/* ── Comment Section ── */}
       <CommentSection postId={post.id} isOpen={showComments} />

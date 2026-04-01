@@ -1,6 +1,7 @@
 import { Visibility } from "@prisma/client";
 import prisma from "../config/database";
 import { AppError } from "../middleware/error.middleware";
+import { createNotification } from "./notification.service";
 
 // ── Types ─────────────────────────────────────────────────
 interface CreatePostInput {
@@ -9,6 +10,7 @@ interface CreatePostInput {
   videoUrl?: string;
   visibility?: Visibility;
   sharedPostId?: string;
+  sourcePostId?: string;
 }
 
 interface UpdatePostInput {
@@ -68,8 +70,32 @@ export const getPostSelect = (userId?: string) => ({
 // ── Create Post ───────────────────────────────────────────
 export async function createPost(userId: string, input: CreatePostInput) {
   if (input.sharedPostId) {
-    await prisma.post.update({
+    const originalPost = await prisma.post.update({
       where: { id: input.sharedPostId },
+      data: { shareCount: { increment: 1 } },
+    });
+
+    // Notify the original post author about the share
+    if (originalPost.authorId !== userId) {
+      const actor = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { firstName: true, lastName: true },
+      });
+      if (actor) {
+        await createNotification(
+          originalPost.authorId,
+          userId,
+          "SHARE",
+          input.sharedPostId,
+          `${actor.firstName} ${actor.lastName} shared your post.`
+        );
+      }
+    }
+  }
+
+  if (input.sourcePostId && input.sourcePostId !== input.sharedPostId) {
+    await prisma.post.update({
+      where: { id: input.sourcePostId },
       data: { shareCount: { increment: 1 } },
     });
   }
