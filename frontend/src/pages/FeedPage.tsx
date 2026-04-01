@@ -17,7 +17,7 @@ export default function FeedPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
-  const [, setPage] = useState(1);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const seedRef = useRef(Math.random().toString(36).substring(7));
   const observerTarget = useRef<HTMLDivElement | null>(null);
@@ -28,17 +28,19 @@ export default function FeedPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   // Fetch posts on mount or pagination
-  const fetchPosts = useCallback(async (pageNum: number, isInitial = false) => {
+  const fetchPosts = useCallback(async (cursorStr: string | null = null, isInitial = false) => {
     if (isInitial) setIsLoading(true);
     else setIsFetchingMore(true);
 
     try {
       if (isInitial) setLoadError(null);
-      const res = await apiClient.get(`/feed?page=${pageNum}&limit=5&seed=${seedRef.current}`);
+      const cursorParam = cursorStr ? `&cursor=${encodeURIComponent(cursorStr)}` : "";
+      const res = await apiClient.get(`/feed?limit=5&seed=${seedRef.current}${cursorParam}`);
       const newPosts = res.data.posts || [];
       
       setPosts(prev => isInitial ? newPosts : [...prev, ...newPosts]);
       setHasMore(res.data.hasMore);
+      setNextCursor(res.data.nextCursor);
     } catch (error) {
       console.error("Failed to fetch posts:", error);
       if (isInitial) {
@@ -51,7 +53,7 @@ export default function FeedPage() {
   }, []);
 
   useEffect(() => {
-    fetchPosts(1, true);
+    fetchPosts(null, true);
     getUnreadCount().then(res => setUnreadCount(typeof res === 'number' ? res : (res as any).unreadCount || 0)).catch(console.error);
   }, [fetchPosts]);
 
@@ -60,11 +62,7 @@ export default function FeedPage() {
     const observer = new IntersectionObserver(
       entries => {
         if (entries[0].isIntersecting && hasMore && !isLoading && !isFetchingMore) {
-          setPage(prev => {
-            const next = prev + 1;
-            fetchPosts(next, false);
-            return next;
-          });
+          fetchPosts(nextCursor, false);
         }
       },
       { rootMargin: "100px", threshold: 1.0 }
