@@ -53,9 +53,10 @@ export default function PostCard({ post, onCommentClick, onPostDeleted, onPostUp
   const [currentContent, setCurrentContent] = useState(post.content);
   const [currentVisibility, setCurrentVisibility] = useState(post.visibility);
   const [shareToast, setShareToast] = useState<{ visible: boolean; type: "success" | "error"; message: string }>({ visible: false, type: "success", message: "" });
+  const [saveToast, setSaveToast] = useState<{ visible: boolean; type: "success" | "info" | "error"; message: string }>({ visible: false, type: "success", message: "" });
   const { user } = useAuth();
   const navigate = useNavigate();
-  
+
   const menuRef = useRef<HTMLDivElement>(null);
 
   const isOwner = user?.userId === post.authorId;
@@ -80,16 +81,20 @@ export default function PostCard({ post, onCommentClick, onPostDeleted, onPostUp
     const previouslySaved = isSaved;
     setIsSaved(!previouslySaved);
     setShowMenu(false);
-    
+
     try {
       if (previouslySaved) {
         await unsavePost(user.userId, post.id);
+        setSaveToast({ visible: true, type: "info", message: "Post removed from saved." });
       } else {
         await savePost(user.userId, post.id);
+        setSaveToast({ visible: true, type: "success", message: "Post saved!" });
       }
     } catch (err) {
       setIsSaved(previouslySaved);
+      setSaveToast({ visible: true, type: "error", message: "Failed to update saved status." });
     }
+    setTimeout(() => setSaveToast({ visible: false, type: "success", message: "" }), 3000);
   };
 
   // Simplified toggle strategy (assuming clicking 'React' sends a LIKE)
@@ -152,14 +157,14 @@ export default function PostCard({ post, onCommentClick, onPostDeleted, onPostUp
           </span>
         </div>
         <div className="post-menu-container" ref={menuRef}>
-          <button 
-            className="post-more-btn" 
+          <button
+            className="post-more-btn"
             aria-label="More options"
             onClick={() => setShowMenu(!showMenu)}
           >
             <FiMoreHorizontal size={20} />
           </button>
-          
+
           {showMenu && (
             <div className="post-dropdown-menu">
               <button className="post-dropdown-item" onClick={handleSavePost}>
@@ -204,9 +209,9 @@ export default function PostCard({ post, onCommentClick, onPostDeleted, onPostUp
       {post.sharedPost && (
         <div className="shared-post-embed" style={{ border: "1px solid var(--border-color)", borderLeft: "3px solid var(--primary-color)", margin: "0 16px 16px", padding: "12px", borderRadius: "8px", cursor: "pointer" }} onClick={() => navigate(`/profile/${post.sharedPost!.author.id}`)}>
           <div className="shared-post-header" style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "8px" }}>
-             <img src={post.sharedPost.author.profilePicture || "https://placehold.co/40x40"} style={{ width: "24px", height: "24px", borderRadius: "50%", objectFit: "cover", backgroundColor: "var(--bg-secondary)" }} />
-             <span style={{ fontWeight: 600, fontSize: "0.9rem", color: "var(--text-primary)" }}>{post.sharedPost.author.firstName} {post.sharedPost.author.lastName}</span>
-             <span style={{ color: "var(--text-secondary)", fontSize: "0.8rem" }}>· {timeAgo(post.sharedPost.createdAt)}</span>
+            <img src={post.sharedPost.author.profilePicture || "https://placehold.co/40x40"} style={{ width: "24px", height: "24px", borderRadius: "50%", objectFit: "cover", backgroundColor: "var(--bg-secondary)" }} />
+            <span style={{ fontWeight: 600, fontSize: "0.9rem", color: "var(--text-primary)" }}>{post.sharedPost.author.firstName} {post.sharedPost.author.lastName}</span>
+            <span style={{ color: "var(--text-secondary)", fontSize: "0.8rem" }}>· {timeAgo(post.sharedPost.createdAt)}</span>
           </div>
           <p style={{ fontSize: "0.95rem", margin: 0, whiteSpace: "pre-wrap" }}>{post.sharedPost.content}</p>
           {post.sharedPost.imageUrl && <img src={post.sharedPost.imageUrl} alt="Shared post image" style={{ width: "100%", borderRadius: "8px", marginTop: "8px" }} />}
@@ -257,6 +262,11 @@ export default function PostCard({ post, onCommentClick, onPostDeleted, onPostUp
       {shareToast.visible && (
         <div className={`share-toast share-toast--${shareToast.type}`}>
           {shareToast.message}
+        </div>
+      )}
+      {saveToast.visible && (
+        <div className={`share-toast share-toast--${saveToast.type}`}>
+          {saveToast.message}
         </div>
       )}
 

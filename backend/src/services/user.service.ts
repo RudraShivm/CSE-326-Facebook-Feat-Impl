@@ -125,6 +125,23 @@ export async function getSavedPosts(userId: string, cursor?: string, limit: numb
               profilePicture: true,
             },
           },
+          sharedPost: {
+            select: {
+              id: true,
+              content: true,
+              imageUrl: true,
+              videoUrl: true,
+              createdAt: true,
+              author: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  profilePicture: true,
+                },
+              },
+            },
+          },
         },
       },
     },
