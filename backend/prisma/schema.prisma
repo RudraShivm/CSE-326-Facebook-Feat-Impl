@@ -108,7 +108,7 @@ model User {
 // ─────────────────────────────────────────────
 
 model SavedPost {
-  id        String   @id @default(uuid())
+  id        String   @id @default(uuid()) @map("saved_post_id")
   userId    String   @map("user_id")
   postId    String   @map("post_id")
   createdAt DateTime @default(now()) @map("created_at")
@@ -125,7 +125,7 @@ model SavedPost {
 // ─────────────────────────────────────────────
 
 model BlockedUser {
-  id        String   @id @default(uuid())
+  id        String   @id @default(uuid()) @map("block_id")
   blockerId String   @map("blocker_id")
   blockedId String   @map("blocked_id")
   createdAt DateTime @default(now()) @map("created_at")
