@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import PostCard from "../components/PostCard";
-import CreatePostModal from "../components/CreatePostModal";
 import GlobalMenu from "../components/GlobalMenu";
 import { Post } from "../api/posts";
 import { getApiErrorMessage } from "../api/error";
@@ -9,10 +8,13 @@ import { getUnreadCount } from "../api/notifications";
 import apiClient from "../api/client";
 import { FiSearch, FiBell, FiLock, FiUnlock } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
+import { useCreatePostAction } from "../hooks/useCreatePostAction";
+import { useAppToast } from "../contexts/AppToastContext";
 
 export default function FeedPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { showToast } = useAppToast();
   const [posts, setPosts] = useState<Post[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -22,7 +24,6 @@ export default function FeedPage() {
   const seedRef = useRef(Math.random().toString(36).substring(7));
   const observerTarget = useRef<HTMLDivElement | null>(null);
 
-  const [showCreateModal, setShowCreateModal] = useState(false);
   const [showGlobalMenu, setShowGlobalMenu] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -73,11 +74,21 @@ export default function FeedPage() {
     }
 
     return () => observer.disconnect();
-  }, [hasMore, isLoading, isFetchingMore, fetchPosts]);
+  }, [hasMore, isLoading, isFetchingMore, fetchPosts, nextCursor]);
 
   // Add new post to the top of the feed
   const handlePostCreated = (newPost: Post) => {
     setPosts((prev) => [newPost, ...prev]);
+  };
+  const openCreatePost = useCreatePostAction({ onPostCreated: handlePostCreated });
+
+  const handlePostDeleted = (postId: string) => {
+    setPosts((prev) => prev.filter((post) => post.id !== postId));
+    showToast("Post deleted successfully!");
+  };
+
+  const handlePostUpdated = (updatedPost: Post) => {
+    setPosts((prev) => prev.map((post) => (post.id === updatedPost.id ? updatedPost : post)));
   };
 
   const initials = user ? `${user.firstName[0]}${user.lastName[0]}` : "?";
@@ -134,7 +145,13 @@ export default function FeedPage() {
         ) : (
           <div className="feed-list">
             {posts.map((post) => (
-              <PostCard key={post.id} post={post} />
+              <PostCard
+                key={post.id}
+                post={post}
+                enableAutoplayVideo={true}
+                onPostDeleted={handlePostDeleted}
+                onPostUpdated={handlePostUpdated}
+              />
             ))}
             
             {hasMore && (
@@ -173,14 +190,7 @@ export default function FeedPage() {
       <GlobalMenu
         isOpen={showGlobalMenu}
         onClose={() => setShowGlobalMenu(false)}
-        onCreatePost={() => setShowCreateModal(true)}
-      />
-
-      {/* ── Create Post Modal ── */}
-      <CreatePostModal
-        isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-        onPostCreated={handlePostCreated}
+        onCreatePost={openCreatePost}
       />
     </div>
   );

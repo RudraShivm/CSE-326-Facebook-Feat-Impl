@@ -6,12 +6,14 @@ import { Post } from "../api/posts";
 import PostCard from "../components/PostCard";
 import GlobalMenu from "../components/GlobalMenu";
 import { FiSearch, FiUser, FiFileText } from "react-icons/fi";
+import { useCreatePostAction } from "../hooks/useCreatePostAction";
 
 type FilterType = "all" | "users" | "posts";
 
 export default function SearchPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const openCreatePost = useCreatePostAction();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<FilterType>("all");
   const [results, setResults] = useState<SearchResults | null>(null);
@@ -225,7 +227,7 @@ export default function SearchPage() {
       <GlobalMenu
         isOpen={showGlobalMenu}
         onClose={() => setShowGlobalMenu(false)}
-        onCreatePost={() => {}}
+        onCreatePost={openCreatePost}
       />
     </div>
   );

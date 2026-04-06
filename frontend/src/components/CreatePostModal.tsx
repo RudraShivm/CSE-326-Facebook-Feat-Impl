@@ -148,7 +148,7 @@ export default function CreatePostModal({ isOpen, onClose, onPostCreated }: Crea
           )}
 
           {/* ── Media Attach Buttons ── */}
-          <div className="create-post-attachments">
+          <div className="create-post-attachments" onClick={() => fileInputRef.current?.click()}>
             <span>Add to your post</span>
             <div className="attachment-actions">
               <input 
@@ -158,7 +158,7 @@ export default function CreatePostModal({ isOpen, onClose, onPostCreated }: Crea
                 accept="image/*,video/*"
                 onChange={handleFileChange}
               />
-              <button type="button" onClick={() => fileInputRef.current?.click()} className="attach-btn" title="Add Photo/Video">
+              <button type="button"  className="attach-btn" title="Add Photo/Video">
                 <FiImage size={24} color="#45BD62" />
               </button>
             </div>

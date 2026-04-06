@@ -17,9 +17,9 @@ const createPostSchema = z.object({
 );
 
 const updatePostSchema = z.object({
-  content: z.string().min(1).max(5000).optional(),
-  imageUrl: z.string().url().optional(),
-  videoUrl: z.string().url().optional(),
+  content: z.string().max(5000).optional(),
+  imageUrl: z.string().url().nullable().optional(),
+  videoUrl: z.string().url().nullable().optional(),
   visibility: z.enum(["PUBLIC", "FRIENDS", "PRIVATE"]).optional(),
 });
 

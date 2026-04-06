@@ -6,8 +6,8 @@ import { createNotification } from "./notification.service";
 // ── Types ─────────────────────────────────────────────────
 interface CreatePostInput {
   content?: string;
-  imageUrl?: string;
-  videoUrl?: string;
+  imageUrl?: string | null;
+  videoUrl?: string | null;
   visibility?: Visibility;
   sharedPostId?: string;
   sourcePostId?: string;
@@ -15,8 +15,8 @@ interface CreatePostInput {
 
 interface UpdatePostInput {
   content?: string;
-  imageUrl?: string;
-  videoUrl?: string;
+  imageUrl?: string | null;
+  videoUrl?: string | null;
   visibility?: Visibility;
 }
 

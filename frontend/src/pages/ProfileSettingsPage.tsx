@@ -5,6 +5,7 @@ import { getProfile, updateProfile, UserProfile, UpdateProfileInput } from "../a
 import { getApiErrorMessage } from "../api/error";
 import { uploadMedia } from "../api/storage";
 import GlobalMenu from "../components/GlobalMenu";
+import { useCreatePostAction } from "../hooks/useCreatePostAction";
 import { FiSearch, FiBell, FiPlus, FiCamera, FiLoader } from "react-icons/fi";
 
 const JOB_OPTIONS = ["Unemployed", "Student", "Employed", "Freelancer", "Self-employed", "Other"];
@@ -34,6 +35,7 @@ function validateLinkedin(link: string): string | null {
 export default function ProfileSettingsPage() {
   const { user, updateUserContext } = useAuth();
   const navigate = useNavigate();
+  const openCreatePost = useCreatePostAction();
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -384,7 +386,7 @@ export default function ProfileSettingsPage() {
       <GlobalMenu
         isOpen={showGlobalMenu}
         onClose={() => setShowGlobalMenu(false)}
-        onCreatePost={() => {}}
+        onCreatePost={openCreatePost}
       />
     </div>
   );

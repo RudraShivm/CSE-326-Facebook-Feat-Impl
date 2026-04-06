@@ -1,6 +1,7 @@
 import { useState, FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import GlobalMenu from "../components/GlobalMenu";
+import { useCreatePostAction } from "../hooks/useCreatePostAction";
 import { FiPlus, FiX, FiLink, FiSearch, FiBell } from "react-icons/fi";
 
 interface Shortcut {
@@ -19,6 +20,7 @@ const INITIAL_SHORTCUTS: Shortcut[] = [
 
 export default function ShortcutsPage() {
   const navigate = useNavigate();
+  const openCreatePost = useCreatePostAction();
   const [shortcuts, setShortcuts] = useState<Shortcut[]>(INITIAL_SHORTCUTS);
   const [searchQuery, setSearchQuery] = useState("");
   const [showAddCustom, setShowAddCustom] = useState(false);
@@ -230,7 +232,7 @@ export default function ShortcutsPage() {
       <GlobalMenu
         isOpen={showGlobalMenu}
         onClose={() => setShowGlobalMenu(false)}
-        onCreatePost={() => {}}
+        onCreatePost={openCreatePost}
       />
     </div>
   );

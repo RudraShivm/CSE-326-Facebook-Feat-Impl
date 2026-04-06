@@ -37,8 +37,8 @@ export interface Post {
 
 export interface CreatePostInput {
   content?: string;
-  imageUrl?: string;
-  videoUrl?: string;
+  imageUrl?: string | null;
+  videoUrl?: string | null;
   visibility?: "PUBLIC" | "FRIENDS" | "PRIVATE";
   sharedPostId?: string;
   sourcePostId?: string;
