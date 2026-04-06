@@ -6,11 +6,13 @@ import { getSavedPosts } from "../api/users";
 import { Post } from "../api/posts";
 import PostCard from "../components/PostCard";
 import GlobalMenu from "../components/GlobalMenu";
+import { useCreatePostAction } from "../hooks/useCreatePostAction";
 import { FiSearch, FiBell, FiBookmark } from "react-icons/fi";
 
 export default function SavedPostsPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const openCreatePost = useCreatePostAction();
   const [posts, setPosts] = useState<Post[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -111,7 +113,7 @@ export default function SavedPostsPage() {
       <GlobalMenu
         isOpen={showGlobalMenu}
         onClose={() => setShowGlobalMenu(false)}
-        onCreatePost={() => {}}
+        onCreatePost={openCreatePost}
       />
     </div>
   );

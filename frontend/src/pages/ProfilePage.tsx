@@ -7,6 +7,8 @@ import { uploadMedia } from "../api/storage";
 import { Post } from "../api/posts";
 import PostCard from "../components/PostCard";
 import GlobalMenu from "../components/GlobalMenu";
+import { useCreatePostAction } from "../hooks/useCreatePostAction";
+import { useAppToast } from "../contexts/AppToastContext";
 import {
   FiSearch,
   FiBell,
@@ -24,6 +26,8 @@ export default function ProfilePage() {
   const { userId } = useParams<{ userId: string }>();
   const navigate = useNavigate();
   const { user, updateUserContext } = useAuth();
+  const openCreatePost = useCreatePostAction();
+  const { showToast } = useAppToast();
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
@@ -185,6 +189,14 @@ export default function ProfilePage() {
   const profileInitials = `${profile.firstName[0]}${profile.lastName[0]}`;
   const isOwnProfile = user?.userId === profile.id;
   const hasNoInfo = !profile.instagramLink && !profile.linkedinLink && !profile.jobStatus && !profile.relationshipStatus;
+  const handlePostDeleted = (postId: string) => {
+    setPosts((prev) => prev.filter((post) => post.id !== postId));
+    showToast("Post deleted successfully!");
+  };
+
+  const handlePostUpdated = (updatedPost: Post) => {
+    setPosts((prev) => prev.map((post) => (post.id === updatedPost.id ? updatedPost : post)));
+  };
 
   return (
     <div className="profile-page">
@@ -319,7 +331,13 @@ export default function ProfilePage() {
           ) : (
             <div className="feed-list">
               {posts.map((post) => (
-                <PostCard key={post.id} post={post} />
+                <PostCard
+                  key={post.id}
+                  post={post}
+                  enableAutoplayVideo={true}
+                  onPostDeleted={handlePostDeleted}
+                  onPostUpdated={handlePostUpdated}
+                />
               ))}
             </div>
           )}
@@ -339,7 +357,7 @@ export default function ProfilePage() {
       <GlobalMenu
         isOpen={showGlobalMenu}
         onClose={() => setShowGlobalMenu(false)}
-        onCreatePost={() => {}}
+        onCreatePost={openCreatePost}
       />
     </div>
   );

@@ -4,6 +4,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { getApiErrorMessage } from "../api/error";
 import { getNotifications, markAsRead, markAllAsRead, NotificationItem } from "../api/notifications";
 import GlobalMenu from "../components/GlobalMenu";
+import { useCreatePostAction } from "../hooks/useCreatePostAction";
 import { FiBell, FiCheckCircle } from "react-icons/fi";
 
 function formatDateGroup(dateStr: string): string {
@@ -32,6 +33,7 @@ function timeAgo(dateStr: string): string {
 export default function NotificationPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const openCreatePost = useCreatePostAction();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -221,7 +223,7 @@ export default function NotificationPage() {
       <GlobalMenu
         isOpen={showGlobalMenu}
         onClose={() => setShowGlobalMenu(false)}
-        onCreatePost={() => {}}
+        onCreatePost={openCreatePost}
       />
     </div>
   );

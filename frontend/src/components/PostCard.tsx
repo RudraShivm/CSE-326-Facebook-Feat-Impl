@@ -1,9 +1,21 @@
-import { FiShare2, FiHeart, FiMessageCircle, FiMoreHorizontal, FiGlobe, FiUsers, FiLock, FiBookmark, FiEdit2 } from "react-icons/fi";
+import {
+  FiShare2,
+  FiHeart,
+  FiMessageCircle,
+  FiMoreHorizontal,
+  FiGlobe,
+  FiUsers,
+  FiLock,
+  FiBookmark,
+  FiEdit2,
+  FiTrash2,
+} from "react-icons/fi";
 import { useState, useRef, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { Post, updatePost, deletePost, createPost } from "../api/posts";
+import { createPortal } from "react-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import { Post, deletePost, createPost } from "../api/posts";
 import CommentSection from "./CommentSection";
-import EditPostModal from "./EditPostModal";
+import AutoPlayVideo from "./AutoPlayVideo";
 import { togglePostReaction } from "../api/reactions";
 import { savePost, unsavePost } from "../api/users";
 import { useAuth } from "../contexts/AuthContext";
@@ -14,9 +26,9 @@ interface PostCardProps {
   onPostDeleted?: (postId: string) => void;
   onPostUpdated?: (post: Post) => void;
   initiallyShowComments?: boolean;
+  enableAutoplayVideo?: boolean;
 }
 
-// Format timestamp string to relative time (e.g., "2h ago")
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
   const minutes = Math.floor(diff / 60000);
@@ -29,19 +41,29 @@ function timeAgo(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString();
 }
 
-// Visibility icon matching MockUI
 function VisibilityIcon({ visibility }: { visibility: string }) {
   switch (visibility) {
-    case "PUBLIC": return <FiGlobe size={12} title="Public" />;
-    case "FRIENDS": return <FiUsers size={12} title="Friends" />;
-    case "PRIVATE": return <FiLock size={12} title="Only me" />;
-    default: return <FiGlobe size={12} />;
+    case "PUBLIC":
+      return <FiGlobe size={12} title="Public" />;
+    case "FRIENDS":
+      return <FiUsers size={12} title="Friends" />;
+    case "PRIVATE":
+      return <FiLock size={12} title="Only me" />;
+    default:
+      return <FiGlobe size={12} />;
   }
 }
 
 const POST_COLLAPSE_LIMIT = 300;
 
-export default function PostCard({ post, onCommentClick, onPostDeleted, onPostUpdated, initiallyShowComments = false }: PostCardProps) {
+export default function PostCard({
+  post,
+  onCommentClick,
+  onPostDeleted,
+  onPostUpdated,
+  initiallyShowComments = false,
+  enableAutoplayVideo = false,
+}: PostCardProps) {
   const [showComments, setShowComments] = useState(initiallyShowComments);
   const [showMenu, setShowMenu] = useState(false);
   const [isReacted, setIsReacted] = useState((post as any).hasReacted || false);
@@ -49,32 +71,92 @@ export default function PostCard({ post, onCommentClick, onPostDeleted, onPostUp
   const [shareCount, setShareCount] = useState(post.shareCount);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isSaved, setIsSaved] = useState(!!post.isSaved);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [currentContent, setCurrentContent] = useState(post.content);
-  const [currentVisibility, setCurrentVisibility] = useState(post.visibility);
-  const [shareToast, setShareToast] = useState<{ visible: boolean; type: "success" | "error"; message: string }>({ visible: false, type: "success", message: "" });
-  const [saveToast, setSaveToast] = useState<{ visible: boolean; type: "success" | "info" | "error"; message: string }>({ visible: false, type: "success", message: "" });
+  const [shareToast, setShareToast] = useState<{ visible: boolean; type: "success" | "error"; message: string }>({
+    visible: false,
+    type: "success",
+    message: "",
+  });
+  const [saveToast, setSaveToast] = useState<{ visible: boolean; type: "success" | "info" | "error"; message: string }>({
+    visible: false,
+    type: "success",
+    message: "",
+  });
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
+  const cardRef = useRef<HTMLElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; right: number; minWidth: number } | null>(null);
 
   const isOwner = user?.userId === post.authorId;
-
-  // Close menu when clicking outside
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setShowMenu(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
+  const canDeleteFromMenu = Boolean(onPostDeleted);
   const authorName = `${post.author.firstName} ${post.author.lastName}`;
   const initials = `${post.author.firstName[0]}${post.author.lastName[0]}`;
-  const isLongContent = currentContent && currentContent.length > POST_COLLAPSE_LIMIT;
+  const isLongContent = post.content && post.content.length > POST_COLLAPSE_LIMIT;
+
+  useEffect(() => {
+    setIsReacted((post as any).hasReacted || false);
+    setLikeCount(post.likeCount);
+    setShareCount(post.shareCount);
+    setIsSaved(!!post.isSaved);
+  }, [post]);
+
+  useEffect(() => {
+    if (!showMenu) {
+      return;
+    }
+
+    function handleClickOutside(event: MouseEvent) {
+      const target = event.target as Node;
+
+      if (menuRef.current?.contains(target) || menuButtonRef.current?.contains(target)) {
+        return;
+      }
+
+      setShowMenu(false);
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showMenu]);
+
+  useEffect(() => {
+    if (!showMenu) {
+      return;
+    }
+
+    function updateMenuPosition() {
+      const rect = menuButtonRef.current?.getBoundingClientRect();
+      if (!rect) {
+        return;
+      }
+
+      const minMenuWidth = 190;
+      const estimatedMenuHeight = 148;
+      const cardRect = cardRef.current?.getBoundingClientRect();
+      const contentInset = 16;
+      const preferredRightEdge = cardRect ? cardRect.right - contentInset : rect.right;
+      const right = Math.max(16, window.innerWidth - preferredRightEdge);
+      const preferredTop = rect.bottom + 8;
+      const top =
+        preferredTop + estimatedMenuHeight > window.innerHeight - 16
+          ? Math.max(16, rect.top - estimatedMenuHeight - 8)
+          : preferredTop;
+
+      setMenuPosition({ top, right, minWidth: minMenuWidth });
+    }
+
+    updateMenuPosition();
+    window.addEventListener("resize", updateMenuPosition);
+    window.addEventListener("scroll", updateMenuPosition, true);
+
+    return () => {
+      window.removeEventListener("resize", updateMenuPosition);
+      window.removeEventListener("scroll", updateMenuPosition, true);
+    };
+  }, [showMenu]);
 
   const handleSavePost = async () => {
     if (!user) return;
@@ -90,58 +172,102 @@ export default function PostCard({ post, onCommentClick, onPostDeleted, onPostUp
         await savePost(user.userId, post.id);
         setSaveToast({ visible: true, type: "success", message: "Post saved!" });
       }
-    } catch (err) {
+    } catch {
       setIsSaved(previouslySaved);
       setSaveToast({ visible: true, type: "error", message: "Failed to update saved status." });
     }
-    setTimeout(() => setSaveToast({ visible: false, type: "success", message: "" }), 3000);
+
+    window.setTimeout(() => setSaveToast({ visible: false, type: "success", message: "" }), 3000);
   };
 
-  // Simplified toggle strategy (assuming clicking 'React' sends a LIKE)
   const handleReact = async () => {
-    const currentlyReacted = isReacted;
-    setIsReacted(!currentlyReacted);
-    setLikeCount(prev => currentlyReacted ? prev - 1 : prev + 1);
+    const previouslyReacted = isReacted;
+    setIsReacted(!previouslyReacted);
+    setLikeCount((prev) => (previouslyReacted ? prev - 1 : prev + 1));
 
     try {
       const result = await togglePostReaction(post.id, "LIKE");
-      if (result.status === "removed") setIsReacted(false);
-      else setIsReacted(true);
-    } catch (err) {
-      setIsReacted(currentlyReacted);
-      setLikeCount(prev => currentlyReacted ? prev + 1 : prev - 1);
+      setIsReacted(result.status !== "removed");
+    } catch {
+      setIsReacted(previouslyReacted);
+      setLikeCount((prev) => (previouslyReacted ? prev + 1 : prev - 1));
     }
   };
 
-  const handleEditSave = async (postId: string, content: string, visibility: string) => {
-    const updated = await updatePost(postId, { content, visibility: visibility as Post["visibility"] });
-    setCurrentContent(updated.content);
-    setCurrentVisibility(updated.visibility);
-    onPostUpdated?.(updated);
-  };
-
-  const handleDeletePost = async (postId: string) => {
-    await deletePost(postId);
-    onPostDeleted?.(postId);
+  const handleDelete = async () => {
+    setShowMenu(false);
+    await deletePost(post.id);
+    onPostDeleted?.(post.id);
   };
 
   const handleShare = async () => {
     if (!user) return;
+
     try {
       const idToShare = post.sharedPostId || post.id;
-      await createPost({ content: "", sharedPostId: idToShare, sourcePostId: post.id, visibility: "PUBLIC" });
-      setShareCount(prev => prev + 1);
+      const shared = await createPost({
+        content: "",
+        sharedPostId: idToShare,
+        sourcePostId: post.id,
+        visibility: "PUBLIC",
+      });
+
+      setShareCount((prev) => prev + 1);
+      onPostUpdated?.(shared);
       setShareToast({ visible: true, type: "success", message: "Post shared successfully!" });
-    } catch (e) {
-      console.error(e);
+    } catch (error) {
+      console.error(error);
       setShareToast({ visible: true, type: "error", message: "Failed to share post." });
     }
-    setTimeout(() => setShareToast({ visible: false, type: "success", message: "" }), 3000);
+
+    window.setTimeout(() => setShareToast({ visible: false, type: "success", message: "" }), 3000);
   };
 
+  const handleEdit = () => {
+    setShowMenu(false);
+    navigate(`/post/${post.id}/edit`, {
+      state: {
+        returnTo: `${location.pathname}${location.search}`,
+      },
+    });
+  };
+
+  const menuContent =
+    showMenu && menuPosition
+      ? createPortal(
+          <div
+            ref={menuRef}
+            className="post-dropdown-menu post-dropdown-menu-portal"
+            style={{
+              position: "fixed",
+              top: menuPosition.top,
+              right: menuPosition.right,
+              minWidth: menuPosition.minWidth,
+            }}
+          >
+            <button className="post-dropdown-item" onClick={handleSavePost}>
+              <FiBookmark size={16} fill={isSaved ? "currentColor" : "none"} />
+              <span>{isSaved ? "Unsave post" : "Save post"}</span>
+            </button>
+            {isOwner && (
+              <button className="post-dropdown-item" onClick={handleEdit}>
+                <FiEdit2 size={16} />
+                <span>Edit post</span>
+              </button>
+            )}
+            {isOwner && canDeleteFromMenu && (
+              <button className="post-dropdown-item post-dropdown-item-danger" onClick={handleDelete}>
+                <FiTrash2 size={16} />
+                <span>Delete post</span>
+              </button>
+            )}
+          </div>,
+          document.body
+        )
+      : null;
+
   return (
-    <article className="post-card card" id={`post-${post.id}`}>
-      {/* ── Header ── */}
+    <article ref={cardRef} className="post-card card" id={`post-${post.id}`}>
       <div className="post-header">
         <div className="post-avatar">
           {post.author.profilePicture ? (
@@ -153,82 +279,110 @@ export default function PostCard({ post, onCommentClick, onPostDeleted, onPostUp
         <div className="post-meta">
           <span className="post-author-name">{authorName}</span>
           <span className="post-time">
-            {timeAgo(post.createdAt)} · <VisibilityIcon visibility={currentVisibility} />
+            {timeAgo(post.createdAt)} · <VisibilityIcon visibility={post.visibility} />
           </span>
         </div>
-        <div className="post-menu-container" ref={menuRef}>
+        <div className="post-menu-container">
           <button
+            ref={menuButtonRef}
             className="post-more-btn"
             aria-label="More options"
-            onClick={() => setShowMenu(!showMenu)}
+            aria-expanded={showMenu}
+            onClick={() => setShowMenu((prev) => !prev)}
           >
             <FiMoreHorizontal size={20} />
           </button>
-
-          {showMenu && (
-            <div className="post-dropdown-menu">
-              <button className="post-dropdown-item" onClick={handleSavePost}>
-                <FiBookmark size={16} fill={isSaved ? "currentColor" : "none"} />
-                <span>{isSaved ? "Unsave post" : "Save post"}</span>
-              </button>
-              {isOwner && (
-                <button
-                  className="post-dropdown-item"
-                  onClick={() => {
-                    setShowMenu(false);
-                    setShowEditModal(true);
-                  }}
-                >
-                  <FiEdit2 size={16} />
-                  <span>Edit post</span>
-                </button>
-              )}
-            </div>
-          )}
         </div>
       </div>
 
-      {/* ── Content ── */}
       <div className="post-content">
         <p>
           {isLongContent && !isExpanded
-            ? currentContent.slice(0, POST_COLLAPSE_LIMIT) + "..."
-            : currentContent}
+            ? `${post.content.slice(0, POST_COLLAPSE_LIMIT)}...`
+            : post.content}
         </p>
         {isLongContent && (
-          <button
-            className="see-more-btn"
-            onClick={() => setIsExpanded(!isExpanded)}
-          >
+          <button className="see-more-btn" onClick={() => setIsExpanded((prev) => !prev)}>
             {isExpanded ? "See less" : "See more"}
           </button>
         )}
       </div>
 
       {post.sharedPost && (
-        <div className="shared-post-embed" style={{ borderTop: "1px solid var(--color-border)", boxShadow: "0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.05)", margin: "0 var(--space-md) var(--space-md)", padding: "var(--space-md)", borderRadius: "var(--radius-md)", cursor: "pointer", background: "var(--color-background)" }} onClick={() => navigate(`/post/${post.sharedPost!.id}`)}>
-          <div className="shared-post-header" style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "8px" }}>
-            <img 
-              src={post.sharedPost.author.profilePicture || "https://placehold.co/40x40"} 
-              style={{ width: "24px", height: "24px", borderRadius: "50%", objectFit: "cover", backgroundColor: "var(--bg-secondary)", cursor: "pointer" }} 
-              onClick={(e) => { e.stopPropagation(); navigate(`/profile/${post.sharedPost!.author.id}`); }}
+        <div
+          className="shared-post-embed"
+          style={{
+            borderTop: "1px solid var(--color-border)",
+            boxShadow: "0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.05)",
+            margin: "0 var(--space-md) var(--space-md)",
+            padding: "var(--space-md)",
+            borderRadius: "var(--radius-md)",
+            cursor: "pointer",
+            background: "var(--color-background)",
+          }}
+          onClick={() => navigate(`/post/${post.sharedPost!.id}`)}
+        >
+          <div
+            className="shared-post-header"
+            style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "8px" }}
+          >
+            <img
+              src={post.sharedPost.author.profilePicture || "https://placehold.co/40x40"}
+              style={{
+                width: "24px",
+                height: "24px",
+                borderRadius: "50%",
+                objectFit: "cover",
+                backgroundColor: "var(--bg-secondary)",
+                cursor: "pointer",
+              }}
+              onClick={(event) => {
+                event.stopPropagation();
+                navigate(`/profile/${post.sharedPost!.author.id}`);
+              }}
             />
-            <span 
+            <span
               className="post-author-name"
-              style={{ fontSize: "0.9rem" }}
-              onClick={(e) => { e.stopPropagation(); navigate(`/profile/${post.sharedPost!.author.id}`); }}
+              style={{ fontSize: "0.9rem", paddingRight: "0px" }}
+              onClick={(event) => {
+                event.stopPropagation();
+                navigate(`/profile/${post.sharedPost!.author.id}`);
+              }}
             >
               {post.sharedPost.author.firstName} {post.sharedPost.author.lastName}
             </span>
-            <span style={{ color: "var(--color-text-secondary)", fontSize: "0.8rem" }}>· {timeAgo(post.sharedPost.createdAt)}</span>
+            <span style={{ color: "var(--color-text-secondary)", fontSize: "0.8rem" }}>
+              · {timeAgo(post.sharedPost.createdAt)}
+            </span>
           </div>
-          <p style={{ fontSize: "0.95rem", margin: 0, whiteSpace: "pre-wrap", color: "var(--color-text)" }}>{post.sharedPost.content}</p>
-          {post.sharedPost.imageUrl && <img src={post.sharedPost.imageUrl} alt="Shared post image" style={{ width: "100%", borderRadius: "8px", marginTop: "8px" }} />}
-          {post.sharedPost.videoUrl && <video src={post.sharedPost.videoUrl} controls style={{ width: "100%", borderRadius: "8px", marginTop: "8px" }} />}
+          <p
+            style={{
+              fontSize: "0.95rem",
+              margin: 0,
+              whiteSpace: "pre-wrap",
+              color: "var(--color-text)",
+            }}
+          >
+            {post.sharedPost.content}
+          </p>
+          {post.sharedPost.imageUrl && (
+            <img
+              src={post.sharedPost.imageUrl}
+              alt="Shared post image"
+              style={{ width: "100%", borderRadius: "8px", marginTop: "8px" }}
+            />
+          )}
+          {post.sharedPost.videoUrl && (
+            <AutoPlayVideo
+              src={post.sharedPost.videoUrl}
+              controls
+              autoPlayWhenVisible={enableAutoplayVideo}
+              style={{ width: "100%", borderRadius: "8px", marginTop: "8px" }}
+            />
+          )}
         </div>
       )}
 
-      {/* ── Media ── */}
       {post.imageUrl && (
         <div className="post-media">
           <img src={post.imageUrl} alt="Post image" className="post-image" />
@@ -236,11 +390,15 @@ export default function PostCard({ post, onCommentClick, onPostDeleted, onPostUp
       )}
       {post.videoUrl && (
         <div className="post-media">
-          <video src={post.videoUrl} controls className="post-video" />
+          <AutoPlayVideo
+            src={post.videoUrl}
+            controls
+            autoPlayWhenVisible={enableAutoplayVideo}
+            className="post-video"
+          />
         </div>
       )}
 
-      {/* ── Action Bar ── */}
       <div className="post-actions">
         <button className="post-action-btn" id={`share-${post.id}`} onClick={handleShare}>
           <FiShare2 size={18} />
@@ -251,14 +409,18 @@ export default function PostCard({ post, onCommentClick, onPostDeleted, onPostUp
           id={`react-${post.id}`}
           onClick={handleReact}
         >
-          <FiHeart size={18} fill={isReacted ? "var(--color-error)" : "none"} color={isReacted ? "var(--color-error)" : "currentColor"} />
+          <FiHeart
+            size={18}
+            fill={isReacted ? "var(--color-error)" : "none"}
+            color={isReacted ? "var(--color-error)" : "currentColor"}
+          />
           <span>{likeCount}</span>
         </button>
         <button
           className="post-action-btn post-action-comment"
           id={`comment-btn-${post.id}`}
           onClick={() => {
-            setShowComments(!showComments);
+            setShowComments((prev) => !prev);
             onCommentClick?.(post.id);
           }}
         >
@@ -267,33 +429,11 @@ export default function PostCard({ post, onCommentClick, onPostDeleted, onPostUp
         </button>
       </div>
 
-      {/* ── Share Toast ── */}
-      {shareToast.visible && (
-        <div className={`share-toast share-toast--${shareToast.type}`}>
-          {shareToast.message}
-        </div>
-      )}
-      {saveToast.visible && (
-        <div className={`share-toast share-toast--${saveToast.type}`}>
-          {saveToast.message}
-        </div>
-      )}
+      {shareToast.visible && <div className={`share-toast share-toast--${shareToast.type}`}>{shareToast.message}</div>}
+      {saveToast.visible && <div className={`share-toast share-toast--${saveToast.type}`}>{saveToast.message}</div>}
 
-      {/* ── Comment Section ── */}
       <CommentSection postId={post.id} isOpen={showComments} />
-
-      {/* ── Edit Post Modal ── */}
-      {showEditModal && (
-        <EditPostModal
-          isOpen={showEditModal}
-          postId={post.id}
-          initialContent={currentContent}
-          initialVisibility={currentVisibility}
-          onClose={() => setShowEditModal(false)}
-          onSave={handleEditSave}
-          onDelete={handleDeletePost}
-        />
-      )}
+      {menuContent}
     </article>
   );
 }

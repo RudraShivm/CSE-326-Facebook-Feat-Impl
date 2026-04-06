@@ -12,6 +12,7 @@ import {
 } from "../api/users";
 import { getApiErrorMessage } from "../api/error";
 import GlobalMenu from "../components/GlobalMenu";
+import { useCreatePostAction } from "../hooks/useCreatePostAction";
 import { FiSearch, FiBell, FiRefreshCw, FiChevronRight, FiPlus } from "react-icons/fi";
 
 const PRIVACY_OPTIONS = ["PUBLIC", "FRIENDS", "PRIVATE"];
@@ -24,6 +25,7 @@ const PRIVACY_LABELS: Record<string, string> = {
 export default function PrivacySettingsPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const openCreatePost = useCreatePostAction();
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [blockedUsers, setBlockedUsers] = useState<BlockedUser[]>([]);
@@ -277,7 +279,7 @@ export default function PrivacySettingsPage() {
       <GlobalMenu
         isOpen={showGlobalMenu}
         onClose={() => setShowGlobalMenu(false)}
-        onCreatePost={() => {}}
+        onCreatePost={openCreatePost}
       />
     </div>
   );
