@@ -910,6 +910,31 @@ img {
   color: var(--color-text);
 }
 
+.shared-post-embed--missing {
+  margin: 0 var(--space-md) var(--space-md);
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
+  border: 1px dashed rgba(148, 163, 184, 0.9);
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.98), rgba(241, 245, 249, 0.98));
+}
+
+.shared-post-missing-card {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.shared-post-missing-title {
+  margin: 0;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.shared-post-missing-text {
+  margin: 0;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
 .edit-post-attachments {
   margin-top: 0;
 }

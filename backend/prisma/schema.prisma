@@ -177,6 +177,7 @@ model Post {
   shares       Post[]       @relation("SharedPost")
 
   // ── Share Relation ──
+  sourcePostId String?      @map("source_post_id")
   sharedPostId String?      @map("shared_post_id")
   sharedPost   Post?        @relation("SharedPost", fields: [sharedPostId], references: [id], onDelete: SetNull)
 

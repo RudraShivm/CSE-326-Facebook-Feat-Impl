@@ -76,6 +76,7 @@ export default function EditPostPage() {
     if (imageUrl) return "image";
     return null;
   }, [imageUrl, selectedFile, videoUrl]);
+  const hasSharedReference = Boolean(post?.sharedPost || post?.sharedPostId || post?.sourcePostId);
 
   useEffect(() => {
     if (!postId) {
@@ -138,7 +139,7 @@ export default function EditPostPage() {
   const handleSave = async () => {
     if (!post) return;
 
-    const hasBody = Boolean(content.trim()) || Boolean(post.sharedPostId) || Boolean(selectedFile) || Boolean(imageUrl) || Boolean(videoUrl);
+    const hasBody = Boolean(content.trim()) || Boolean(post.sharedPostId) || Boolean(post.sourcePostId) || Boolean(selectedFile) || Boolean(imageUrl) || Boolean(videoUrl);
     if (!hasBody) {
       setError("Post must have text, media, or a shared post.");
       return;
@@ -313,14 +314,14 @@ export default function EditPostPage() {
 
             <div className="edit-post-body">
               <label className="edit-post-field">
-                <span className="edit-post-label">{post.sharedPost ? "Your shared caption" : "Post content"}</span>
+                <span className="edit-post-label">{hasSharedReference ? "Your shared caption" : "Post content"}</span>
                 <textarea
                   className="create-post-textarea edit-post-textarea"
                   value={content}
                   onChange={(event) => setContent(event.target.value)}
                   rows={6}
                   maxLength={5000}
-                  placeholder={post.sharedPost ? "Say something about this shared post..." : "What's on your mind?"}
+                  placeholder={hasSharedReference ? "Say something about this shared post..." : "What's on your mind?"}
                 />
               </label>
 
@@ -374,6 +375,16 @@ export default function EditPostPage() {
                       </>
                     );
                   })()}
+                </div>
+              )}
+
+              {!post.sharedPost && post.sourcePostId && (
+                <div className="shared-post-embed shared-post-embed--missing edit-post-shared-preview" style={{ margin: 0 }}>
+                  <p className="edit-post-label">Original shared post</p>
+                  <div className="shared-post-missing-card">
+                    <p className="shared-post-missing-title">Original post unavailable</p>
+                    <p className="shared-post-missing-text">This shared post is no longer available because the original post was deleted.</p>
+                  </div>
                 </div>
               )}
 

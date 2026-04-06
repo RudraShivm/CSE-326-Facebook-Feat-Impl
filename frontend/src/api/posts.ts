@@ -19,6 +19,7 @@ export interface Post {
     lastName: string;
     profilePicture: string | null;
   };
+  sourcePostId?: string | null;
   sharedPostId?: string;
   sharedPost?: {
     id: string;
