@@ -95,6 +95,7 @@ export default function PostCard({
   const authorName = `${post.author.firstName} ${post.author.lastName}`;
   const initials = `${post.author.firstName[0]}${post.author.lastName[0]}`;
   const isLongContent = post.content && post.content.length > POST_COLLAPSE_LIMIT;
+  const hasDeletedSharedPost = Boolean(post.sourcePostId && !post.sharedPost);
 
   useEffect(() => {
     setIsReacted((post as any).hasReacted || false);
@@ -380,6 +381,15 @@ export default function PostCard({
               style={{ width: "100%", borderRadius: "8px", marginTop: "8px" }}
             />
           )}
+        </div>
+      )}
+
+      {hasDeletedSharedPost && (
+        <div className="shared-post-embed shared-post-embed--missing">
+          <div className="shared-post-missing-card">
+            <p className="shared-post-missing-title">Original post unavailable</p>
+            <p className="shared-post-missing-text">This shared post is no longer available because the original post was deleted.</p>
+          </div>
         </div>
       )}
 

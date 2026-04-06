@@ -6,6 +6,8 @@ let user1Id: string;
 let user2Token: string;
 let user2Id: string;
 let originalPostId: string;
+let sharedPostToDeleteId: string;
+let sharedPostForDeletedOriginalId: string;
 
 beforeAll(async () => {
   // Register User 1 (post author)
@@ -61,6 +63,33 @@ describe("Post Sharing", () => {
       .expect(200);
 
     expect(originalPost.body.shareCount).toBe(1);
+  });
+
+  it("should decrement shareCount when a shared post is deleted", async () => {
+    const shareRes = await request(app)
+      .post("/api/v1/posts")
+      .set("Authorization", `Bearer ${user2Token}`)
+      .send({ content: "I am sharing this", sharedPostId: originalPostId, sourcePostId: originalPostId, visibility: "PUBLIC" })
+      .expect(201);
+
+    sharedPostToDeleteId = shareRes.body.id;
+
+    const originalBeforeDelete = await request(app)
+      .get(`/api/v1/posts/${originalPostId}`)
+      .set("Authorization", `Bearer ${user1Token}`)
+      .expect(200);
+
+    await request(app)
+      .delete(`/api/v1/posts/${sharedPostToDeleteId}`)
+      .set("Authorization", `Bearer ${user2Token}`)
+      .expect(204);
+
+    const originalAfterDelete = await request(app)
+      .get(`/api/v1/posts/${originalPostId}`)
+      .set("Authorization", `Bearer ${user1Token}`)
+      .expect(200);
+
+    expect(originalAfterDelete.body.shareCount).toBe(originalBeforeDelete.body.shareCount - 1);
   });
 
   it("should return shared post media (imageUrl and videoUrl)", async () => {
@@ -125,5 +154,30 @@ describe("Post Sharing", () => {
     ).length;
 
     expect(countAfter).toBe(countBefore);
+  });
+
+  it("should keep a shared post visible after the original is deleted and mark the embed as missing", async () => {
+    const shareRes = await request(app)
+      .post("/api/v1/posts")
+      .set("Authorization", `Bearer ${user2Token}`)
+      .send({ content: "Sharing before delete", sharedPostId: originalPostId, sourcePostId: originalPostId, visibility: "PUBLIC" })
+      .expect(201);
+
+    sharedPostForDeletedOriginalId = shareRes.body.id;
+
+    await request(app)
+      .delete(`/api/v1/posts/${originalPostId}`)
+      .set("Authorization", `Bearer ${user1Token}`)
+      .expect(204);
+
+    const sharedPost = await request(app)
+      .get(`/api/v1/posts/${sharedPostForDeletedOriginalId}`)
+      .set("Authorization", `Bearer ${user2Token}`)
+      .expect(200);
+
+    expect(sharedPost.body.content).toBe("Sharing before delete");
+    expect(sharedPost.body.sourcePostId).toBe(originalPostId);
+    expect(sharedPost.body.sharedPostId).toBeFalsy();
+    expect(sharedPost.body.sharedPost).toBeNull();
   });
 });

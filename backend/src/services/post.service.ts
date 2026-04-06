@@ -41,6 +41,7 @@ export const getPostSelect = (userId?: string) => ({
       profilePicture: true,
     },
   },
+  sourcePostId: true,
   sharedPostId: true,
   sharedPost: {
     select: {
@@ -107,6 +108,7 @@ export async function createPost(userId: string, input: CreatePostInput) {
       videoUrl: input.videoUrl || null,
       visibility: input.visibility || "PUBLIC",
       authorId: userId,
+      sourcePostId: input.sourcePostId || input.sharedPostId || null,
       sharedPostId: input.sharedPostId || null,
     },
     select: getPostSelect(userId),
@@ -174,7 +176,7 @@ export async function updatePost(postId: string, userId: string, input: UpdatePo
 export async function deletePost(postId: string, userId: string) {
   const existingPost = await prisma.post.findUnique({
     where: { id: postId },
-    select: { authorId: true },
+    select: { authorId: true, sharedPostId: true, sourcePostId: true },
   });
 
   if (!existingPost) {
@@ -185,7 +187,29 @@ export async function deletePost(postId: string, userId: string) {
     throw new AppError("You can only delete your own posts.", 403, "FORBIDDEN");
   }
 
-  await prisma.post.delete({ where: { id: postId } });
+  await prisma.$transaction(async (tx) => {
+    if (existingPost.sharedPostId) {
+      await tx.post.updateMany({
+        where: {
+          id: existingPost.sharedPostId,
+          shareCount: { gt: 0 },
+        },
+        data: { shareCount: { decrement: 1 } },
+      });
+    }
+
+    if (existingPost.sourcePostId && existingPost.sourcePostId !== existingPost.sharedPostId) {
+      await tx.post.updateMany({
+        where: {
+          id: existingPost.sourcePostId,
+          shareCount: { gt: 0 },
+        },
+        data: { shareCount: { decrement: 1 } },
+      });
+    }
+
+    await tx.post.delete({ where: { id: postId } });
+  });
 }
 
 // ── Get User's Posts ──────────────────────────────────────
