@@ -209,7 +209,9 @@ export async function recordRecentVisitForUser(
       userId: targetUserId,
       visitedProfileId,
     },
-    update: {},
+    update: {
+      updatedAt: new Date(),
+    },
   });
 
   await trimRecentVisits(targetUserId);
