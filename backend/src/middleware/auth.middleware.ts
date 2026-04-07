@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { verifyAccessToken } from "../utils/jwt";
 import { AppError } from "./error.middleware";
 import redis from "../config/redis";
+import { getAccessTokenFromRequest } from "../utils/authCookies";
 
 export async function authenticate(
   req: Request,
@@ -9,19 +10,15 @@ export async function authenticate(
   next: NextFunction
 ): Promise<void> {
   try {
-    // Get the Authorization header
-    const authHeader = req.headers.authorization;
+    const token = getAccessTokenFromRequest(req);
 
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    if (!token) {
       throw new AppError(
         "Authentication token is missing or expired.",
         401,
         "UNAUTHORIZED"
       );
     }
-
-    // Extract the token (remove "Bearer " prefix)
-    const token = authHeader.split(" ")[1];
 
     // Check if token is blacklisted in Redis (from logout)
     const isBlacklisted = await redis.get(`bl_token:${token}`);

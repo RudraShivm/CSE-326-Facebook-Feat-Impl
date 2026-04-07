@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import jwt from "jsonwebtoken";
 
 // These MUST be set in .env — the app will crash if they're missing
@@ -17,6 +18,7 @@ export interface TokenPayload {
 export function generateAccessToken(payload: TokenPayload): string {
   return jwt.sign(payload, ACCESS_SECRET, {
     expiresIn: ACCESS_EXPIRY,
+    jwtid: crypto.randomUUID(),
   });
 }
 
@@ -26,6 +28,7 @@ export function generateAccessToken(payload: TokenPayload): string {
 export function generateRefreshToken(payload: TokenPayload): string {
   return jwt.sign(payload, REFRESH_SECRET, {
     expiresIn: REFRESH_EXPIRY,
+    jwtid: crypto.randomUUID(),
   });
 }
 

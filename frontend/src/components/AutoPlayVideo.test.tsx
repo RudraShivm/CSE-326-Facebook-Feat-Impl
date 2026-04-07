@@ -22,8 +22,6 @@ describe("AutoPlayVideo", () => {
         isActive: true,
       })
     );
-    localStorage.setItem("accessToken", "token");
-
     const { container } = render(
       <AuthProvider>
         <VideoPlaybackProvider>

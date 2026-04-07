@@ -1,12 +1,12 @@
 import request from "supertest";
 import app from "../app";
 
-let accessToken: string;
+const authorAgent = request.agent(app);
 let postId: string;
 let commentId: string;
 
 beforeAll(async () => {
-  const res = await request(app)
+  await authorAgent
     .post("/api/v1/auth/register")
     .send({
       email: "comment-test@example.com",
@@ -15,20 +15,16 @@ beforeAll(async () => {
       lastName: "Tester",
       dateOfBirth: "1998-06-15",
     });
-  accessToken = res.body.accessToken;
-
-  const postRes = await request(app)
+  const postRes = await authorAgent
     .post("/api/v1/posts")
-    .set("Authorization", `Bearer ${accessToken}`)
     .send({ content: "Test post for comments" });
   postId = postRes.body.id;
 });
 
 describe("POST /api/v1/posts/:postId/comments", () => {
   it("should add a comment", async () => {
-    const res = await request(app)
+    const res = await authorAgent
       .post(`/api/v1/posts/${postId}/comments`)
-      .set("Authorization", `Bearer ${accessToken}`)
       .send({ content: "Great post!" })
       .expect(201);
 
@@ -37,18 +33,16 @@ describe("POST /api/v1/posts/:postId/comments", () => {
   });
 
   it("should increment commentCount on post", async () => {
-    const res = await request(app)
+    const res = await authorAgent
       .get(`/api/v1/posts/${postId}`)
-      .set("Authorization", `Bearer ${accessToken}`)
       .expect(200);
 
     expect(res.body.commentCount).toBe(1);
   });
 
   it("should reject empty comment", async () => {
-    await request(app)
+    await authorAgent
       .post(`/api/v1/posts/${postId}/comments`)
-      .set("Authorization", `Bearer ${accessToken}`)
       .send({ content: "" })
       .expect(400);
   });
@@ -56,9 +50,8 @@ describe("POST /api/v1/posts/:postId/comments", () => {
 
 describe("GET /api/v1/posts/:postId/comments", () => {
   it("should list comments", async () => {
-    const res = await request(app)
+    const res = await authorAgent
       .get(`/api/v1/posts/${postId}/comments`)
-      .set("Authorization", `Bearer ${accessToken}`)
       .expect(200);
 
     expect(res.body.comments).toHaveLength(1);
@@ -68,9 +61,8 @@ describe("GET /api/v1/posts/:postId/comments", () => {
 
 describe("PATCH /api/v1/posts/:postId/comments/:commentId", () => {
   it("should edit own comment", async () => {
-    const res = await request(app)
+    const res = await authorAgent
       .patch(`/api/v1/posts/${postId}/comments/${commentId}`)
-      .set("Authorization", `Bearer ${accessToken}`)
       .send({ content: "Updated comment" })
       .expect(200);
 
@@ -80,16 +72,14 @@ describe("PATCH /api/v1/posts/:postId/comments/:commentId", () => {
 
 describe("DELETE /api/v1/posts/:postId/comments/:commentId", () => {
   it("should delete own comment", async () => {
-    await request(app)
+    await authorAgent
       .delete(`/api/v1/posts/${postId}/comments/${commentId}`)
-      .set("Authorization", `Bearer ${accessToken}`)
       .expect(204);
   });
 
   it("should decrement commentCount", async () => {
-    const res = await request(app)
+    const res = await authorAgent
       .get(`/api/v1/posts/${postId}`)
-      .set("Authorization", `Bearer ${accessToken}`)
       .expect(200);
 
     expect(res.body.commentCount).toBe(0);

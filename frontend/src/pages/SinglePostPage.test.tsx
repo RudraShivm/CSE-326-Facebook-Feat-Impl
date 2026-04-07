@@ -51,7 +51,6 @@ describe("SinglePostPage", () => {
         isActive: true,
       })
     );
-    localStorage.setItem("accessToken", "token");
   });
 
   it("shows the common navigation chrome and global menu launcher", async () => {

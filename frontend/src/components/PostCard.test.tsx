@@ -47,7 +47,6 @@ describe("PostCard owner actions", () => {
         isActive: true,
       })
     );
-    localStorage.setItem("accessToken", "token");
   });
 
   it("shows edit and delete in the owner menu and deletes through the callback", async () => {

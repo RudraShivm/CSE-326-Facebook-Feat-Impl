@@ -3,15 +3,23 @@ import { useNavigate } from "react-router-dom";
 import {
   FiX,
   FiUser,
-  FiUsers,
-  FiGrid,
+  FiHome,
   FiBookmark,
   FiSettings,
   FiEdit,
   FiUserPlus,
   FiLogOut,
+  FiBell,
 } from "react-icons/fi";
 import { useAuth } from "../contexts/AuthContext";
+import { getMenuPreferences } from "../api/menu";
+import {
+  RecentVisitProfile,
+  ShortcutItem,
+  getRecentVisits,
+  getShortcuts,
+  hydrateMenuStorage,
+} from "../utils/globalMenuStorage";
 
 interface GlobalMenuProps {
   isOpen: boolean;
@@ -20,50 +28,72 @@ interface GlobalMenuProps {
 }
 
 export default function GlobalMenu({ isOpen, onClose, onCreatePost }: GlobalMenuProps) {
-  const { user, logout } = useAuth();
+  const { user, accounts, logout, switchAccount } = useAuth();
   const navigate = useNavigate();
-
-  // Placeholder recent visits (dismissible)
-  const [recentVisits, setRecentVisits] = useState([
-    "A happy place",
-    "Current Students of BUET",
-    "BUET CSE Fest 2026",
-  ]);
-
-  const dismissRecent = (item: string) => {
-    setRecentVisits((prev) => prev.filter((v) => v !== item));
-  };
+  const [recentVisits, setRecentVisits] = useState<RecentVisitProfile[]>([]);
+  const [shortcuts, setShortcuts] = useState<ShortcutItem[]>([]);
 
   const handleAddAccount = () => {
-    logout();
-    onClose();
-    navigate("/register");
-  };
-
-  const handleSignOut = () => {
-    logout();
     onClose();
     navigate("/login");
   };
 
-  // Lock body scroll when menu is open
+  const handleSignOut = async () => {
+    await logout();
+    onClose();
+    navigate("/login");
+  };
+
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
+      const cachedRecentVisits = getRecentVisits();
+      const cachedShortcuts = getShortcuts();
+      setRecentVisits(cachedRecentVisits);
+      setShortcuts(cachedShortcuts);
+
+      if (user?.userId) {
+        void getMenuPreferences(user.userId)
+          .then((result) => {
+            hydrateMenuStorage(result.recentVisits, result.shortcuts);
+            setRecentVisits(result.recentVisits);
+            setShortcuts(result.shortcuts);
+          })
+          .catch((err) => {
+            console.error("Failed to load menu preferences:", err);
+          });
+      }
     } else {
       document.body.style.overflow = "";
     }
     return () => {
       document.body.style.overflow = "";
     };
-  }, [isOpen]);
+  }, [isOpen, user?.userId]);
 
   if (!isOpen) return null;
+
+  const otherAccounts = accounts.filter((account) => account.user.userId !== user?.userId);
+
+  const openShortcut = (shortcut: ShortcutItem) => {
+    onClose();
+
+    if (shortcut.kind === "profile" && shortcut.profileUserId) {
+      navigate(`/profile/${shortcut.profileUserId}`);
+      return;
+    }
+
+    if (shortcut.url.startsWith("/")) {
+      navigate(shortcut.url);
+      return;
+    }
+
+    window.open(shortcut.url, "_blank", "noopener,noreferrer");
+  };
 
   return (
     <div className="global-menu-overlay" onClick={onClose}>
       <div className="global-menu" onClick={(e) => e.stopPropagation()}>
-        {/* ── Menu Title ── */}
         <div className="global-menu-title-bar">
           <h2 className="global-menu-title">Global Menu</h2>
           <button className="menu-close-btn" onClick={onClose} aria-label="Close menu">
@@ -71,30 +101,52 @@ export default function GlobalMenu({ isOpen, onClose, onCreatePost }: GlobalMenu
           </button>
         </div>
 
-        {/* ── Scrollable Content ── */}
         <div className="global-menu-body">
-          {/* Recent Visits */}
           {recentVisits.length > 0 && (
             <section className="menu-section">
               <h3 className="menu-section-title">Recent Visits</h3>
               <div className="menu-recent-list">
                 {recentVisits.map((item) => (
-                  <div key={item} className="menu-recent-item">
-                    <button
-                      className="menu-recent-dismiss"
-                      onClick={() => dismissRecent(item)}
-                      aria-label={`Dismiss ${item}`}
-                    >
-                      <FiX size={16} />
-                    </button>
-                    <span>{item}</span>
-                  </div>
+                  <button
+                    key={item.id}
+                    type="button"
+                    className="search-user-card menu-recent-profile"
+                    onClick={() => {
+                      onClose();
+                      navigate(`/profile/${item.id}`);
+                    }}
+                  >
+                    <div className="post-avatar" style={{ width: 40, height: 40 }}>
+                      {item.profilePicture ? (
+                        <img
+                          src={item.profilePicture}
+                          alt=""
+                          style={{ width: 40, height: 40, borderRadius: "50%", objectFit: "cover" }}
+                        />
+                      ) : (
+                        <span className="avatar-initials" style={{ fontSize: "0.8rem" }}>
+                          {item.firstName[0]}
+                          {item.lastName[0]}
+                        </span>
+                      )}
+                    </div>
+                    <div className="search-user-info">
+                      <span className="search-user-name">
+                        {item.firstName} {item.lastName}
+                      </span>
+                      {item.bio && (
+                        <span className="search-user-bio">
+                          {item.bio.slice(0, 60)}
+                          {item.bio.length > 60 ? "..." : ""}
+                        </span>
+                      )}
+                    </div>
+                  </button>
                 ))}
               </div>
             </section>
           )}
 
-          {/* Create */}
           <section className="menu-section">
             <h3 className="menu-section-title">Create</h3>
             <button
@@ -114,7 +166,6 @@ export default function GlobalMenu({ isOpen, onClose, onCreatePost }: GlobalMenu
             </button>
           </section>
 
-          {/* Go to + Your Shortcuts (side by side on wider screens) */}
           <div className="menu-columns">
             <section className="menu-section">
               <h3 className="menu-section-title">Go to</h3>
@@ -130,13 +181,25 @@ export default function GlobalMenu({ isOpen, onClose, onCreatePost }: GlobalMenu
                 <FiUser size={20} />
                 <span>Profile</span>
               </button>
-              <button className="menu-goto-item">
-                <FiUsers size={20} />
-                <span>Friends</span>
+              <button
+                className="menu-goto-item"
+                onClick={() => {
+                  onClose();
+                  navigate("/feed");
+                }}
+              >
+                <FiHome size={20} />
+                <span>Feed</span>
               </button>
-              <button className="menu-goto-item">
-                <FiGrid size={20} />
-                <span>Group</span>
+              <button
+                className="menu-goto-item"
+                onClick={() => {
+                  onClose();
+                  navigate("/notifications");
+                }}
+              >
+                <FiBell size={20} />
+                <span>Notifications</span>
               </button>
               <button
                 className="menu-goto-item"
@@ -161,22 +224,30 @@ export default function GlobalMenu({ isOpen, onClose, onCreatePost }: GlobalMenu
               >
                 Your Shortcuts →
               </button>
-              <div className="menu-shortcut-item">
-                <div className="shortcut-icon">📚</div>
-                <span>ISD Study Group</span>
-              </div>
-              <div className="menu-shortcut-item">
-                <div className="shortcut-icon">🔢</div>
-                <span>Chittagong Math Circle - CMC</span>
-              </div>
-              <div className="menu-shortcut-item">
-                <div className="shortcut-icon">🎓</div>
-                <span>NexTop-USA</span>
-              </div>
+              {shortcuts.length === 0 ? (
+                <p className="menu-empty-note">No shortcuts yet.</p>
+              ) : (
+                shortcuts.map((shortcut) => (
+                  <button
+                    key={shortcut.id}
+                    type="button"
+                    className="menu-shortcut-item menu-shortcut-item-button"
+                    onClick={() => openShortcut(shortcut)}
+                  >
+                    <div className="shortcut-icon">
+                      {shortcut.kind === "profile" && shortcut.profilePicture ? (
+                        <img src={shortcut.profilePicture} alt="" className="shortcut-avatar-image" />
+                      ) : (
+                        shortcut.icon
+                      )}
+                    </div>
+                    <span>{shortcut.title}</span>
+                  </button>
+                ))
+              )}
             </section>
           </div>
 
-          {/* Settings */}
           <section className="menu-section">
             <h3 className="menu-section-title">Settings</h3>
             <button
@@ -209,20 +280,33 @@ export default function GlobalMenu({ isOpen, onClose, onCreatePost }: GlobalMenu
             </button>
           </section>
 
-          {/* Account */}
           <section className="menu-section">
             <h3 className="menu-section-title">Account</h3>
             <button className="menu-item" onClick={handleAddAccount} id="menu-add-account">
               <FiUserPlus size={20} />
               <span>Add Account</span>
             </button>
-            <button className="menu-item menu-item-danger" onClick={handleSignOut} id="menu-sign-out">
+            {otherAccounts.map((account) => (
+              <button
+                key={account.sessionId}
+                className="menu-item"
+                onClick={async () => {
+                  await switchAccount(account.sessionId);
+                  onClose();
+                  navigate("/feed");
+                }}
+              >
+                <FiUser size={20} />
+                <span>
+                  Switch to {account.user.firstName} {account.user.lastName}
+                </span>
+              </button>
+            ))}
+            <button className="menu-item menu-item-danger" onClick={() => void handleSignOut()} id="menu-sign-out">
               <FiLogOut size={20} />
               <span>Sign Out</span>
             </button>
           </section>
-
-
         </div>
       </div>
     </div>

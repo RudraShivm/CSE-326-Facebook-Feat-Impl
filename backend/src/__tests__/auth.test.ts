@@ -10,28 +10,23 @@ const testUser = {
   dateOfBirth: "1998-06-15",
 };
 
-let accessToken: string;
-let refreshToken: string;
+const authAgent = request.agent(app);
 
 // ── Register Tests ─────────────────────────────────────────
 describe("POST /api/v1/auth/register", () => {
-  it("should register a new user and return tokens", async () => {
-    const res = await request(app)
+  it("should register a new user and set the access token cookie", async () => {
+    const res = await authAgent
       .post("/api/v1/auth/register")
       .send(testUser)
       .expect(201);
 
-    // Check response shape
-    expect(res.body).toHaveProperty("accessToken");
-    expect(res.body).toHaveProperty("refreshToken");
+    expect(res.headers["set-cookie"]).toEqual(
+      expect.arrayContaining([expect.stringContaining("accessToken=")])
+    );
     expect(res.body).toHaveProperty("user");
     expect(res.body.user).toHaveProperty("userId");
     expect(res.body.user.firstName).toBe("Test");
     expect(res.body.user.lastName).toBe("User");
-
-    // Store tokens for later tests
-    accessToken = res.body.accessToken;
-    refreshToken = res.body.refreshToken;
   });
 
   it("should reject duplicate email", async () => {
@@ -74,7 +69,7 @@ describe("POST /api/v1/auth/register", () => {
 // ── Login Tests ────────────────────────────────────────────
 describe("POST /api/v1/auth/login", () => {
   it("should login with valid credentials", async () => {
-    const res = await request(app)
+    const res = await authAgent
       .post("/api/v1/auth/login")
       .send({
         email: testUser.email,
@@ -82,13 +77,10 @@ describe("POST /api/v1/auth/login", () => {
       })
       .expect(200);
 
-    expect(res.body).toHaveProperty("accessToken");
-    expect(res.body).toHaveProperty("refreshToken");
+    expect(res.headers["set-cookie"]).toEqual(
+      expect.arrayContaining([expect.stringContaining("accessToken=")])
+    );
     expect(res.body.user.firstName).toBe("Test");
-
-    // Update tokens
-    accessToken = res.body.accessToken;
-    refreshToken = res.body.refreshToken;
   });
 
   it("should reject wrong password", async () => {
@@ -119,19 +111,19 @@ describe("POST /api/v1/auth/login", () => {
 // ── Refresh Tests ──────────────────────────────────────────
 describe("POST /api/v1/auth/refresh", () => {
   it("should return a new access token", async () => {
-    const res = await request(app)
+    const res = await authAgent
       .post("/api/v1/auth/refresh")
-      .send({ refreshToken })
       .expect(200);
 
-    expect(res.body).toHaveProperty("accessToken");
     expect(res.body.expiresIn).toBe(900);
+    expect(res.headers["set-cookie"]).toEqual(
+      expect.arrayContaining([expect.stringContaining("accessToken=")])
+    );
   });
 
-  it("should reject invalid refresh token", async () => {
+  it("should reject refresh without a valid session cookie", async () => {
     const res = await request(app)
       .post("/api/v1/auth/refresh")
-      .send({ refreshToken: "invalid-token" })
       .expect(401);
 
     expect(res.body.code).toBe("UNAUTHORIZED");
@@ -141,9 +133,8 @@ describe("POST /api/v1/auth/refresh", () => {
 // ── Logout Tests ───────────────────────────────────────────
 describe("POST /api/v1/auth/logout", () => {
   it("should return 204 when authenticated", async () => {
-    await request(app)
+    await authAgent
       .post("/api/v1/auth/logout")
-      .set("Authorization", `Bearer ${accessToken}`)
       .expect(204);
   });
 
@@ -156,12 +147,16 @@ describe("POST /api/v1/auth/logout", () => {
 
 // ── Protected Route Test ───────────────────────────────────
 describe("Auth Middleware", () => {
-  it("should allow access with valid token", async () => {
-    const res = await request(app)
-      .get("/api/v1/health")
-      .set("Authorization", `Bearer ${accessToken}`)
+  it("should allow access to protected auth/me with a valid cookie session", async () => {
+    await authAgent.post("/api/v1/auth/login").send({
+      email: testUser.email,
+      password: testUser.password,
+    });
+
+    const res = await authAgent
+      .get("/api/v1/auth/me")
       .expect(200);
 
-    expect(res.body.status).toBe("ok");
+    expect(res.body.firstName).toBe("Test");
   });
 });

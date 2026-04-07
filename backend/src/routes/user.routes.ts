@@ -10,6 +10,10 @@ import {
   blockUserHandler,
   unblockUserHandler,
   getBlockedUsers,
+  getMenuPreferencesHandler,
+  recordRecentVisitHandler,
+  addShortcutHandler,
+  removeShortcutHandler,
 } from "../controllers/user.controller";
 
 const router = Router();
@@ -20,6 +24,12 @@ router.put("/:userId", authenticate, updateUser);
 
 // User posts
 router.get("/:userId/posts", authenticate, getUserPosts);
+
+// Menu preferences
+router.get("/:userId/menu-preferences", authenticate, getMenuPreferencesHandler);
+router.post("/:userId/recent-visits", authenticate, recordRecentVisitHandler);
+router.post("/:userId/shortcuts", authenticate, addShortcutHandler);
+router.delete("/:userId/shortcuts/:shortcutId", authenticate, removeShortcutHandler);
 
 // Saved posts
 router.post("/:userId/saved-posts/:postId", authenticate, savePostHandler);

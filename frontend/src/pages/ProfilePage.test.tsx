@@ -60,8 +60,6 @@ describe("ProfilePage", () => {
         isActive: true,
       })
     );
-    localStorage.setItem("accessToken", "token");
-
     getProfileMock.mockResolvedValue({
       id: "user-1",
       firstName: "Owner",
