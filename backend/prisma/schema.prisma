@@ -259,11 +259,16 @@ model Comment {
   author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
   postId    String   @map("post_id")
   post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
-
+  // ── Self-relation for replies ──
+  parentId  String?  @map("parent_id")  // null = top-level comment; set = a reply
+  parent    Comment? @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   Comment[] @relation("CommentReplies")
+  
   reactions  Reaction[]
 
   @@index([postId])
   @@index([authorId])
+  @@index([parentId])
   @@map("comments")
 }
 
