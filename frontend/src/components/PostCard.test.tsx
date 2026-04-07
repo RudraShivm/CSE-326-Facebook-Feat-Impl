@@ -93,6 +93,22 @@ describe("PostCard owner actions", () => {
     expect(await screen.findByText("Edit page")).toBeInTheDocument();
   });
 
+  it("navigates to the author profile from the post header name", async () => {
+    render(
+      <AuthProvider>
+        <MemoryRouter initialEntries={["/feed"]}>
+          <Routes>
+            <Route path="/feed" element={<PostCard post={post} onPostDeleted={vi.fn()} />} />
+            <Route path="/profile/:userId" element={<div>Profile page</div>} />
+          </Routes>
+        </MemoryRouter>
+      </AuthProvider>
+    );
+
+    fireEvent.click(screen.getByText("Owner User"));
+    expect(await screen.findByText("Profile page")).toBeInTheDocument();
+  });
+
   it("aligns the floating menu with the post card content edge", async () => {
     const { container } = render(
       <AuthProvider>

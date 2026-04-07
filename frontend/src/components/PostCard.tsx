@@ -270,7 +270,11 @@ export default function PostCard({
   return (
     <article ref={cardRef} className="post-card card" id={`post-${post.id}`}>
       <div className="post-header">
-        <div className="post-avatar">
+        <div
+          className="post-avatar"
+          onClick={() => navigate(`/profile/${post.author.id}`)}
+          style={{ cursor: "pointer" }}
+        >
           {post.author.profilePicture ? (
             <img src={post.author.profilePicture} alt={authorName} />
           ) : (
@@ -278,7 +282,13 @@ export default function PostCard({
           )}
         </div>
         <div className="post-meta">
-          <span className="post-author-name">{authorName}</span>
+          <span
+            className="post-author-name"
+            onClick={() => navigate(`/profile/${post.author.id}`)}
+            style={{ cursor: "pointer" }}
+          >
+            {authorName}
+          </span>
           <span className="post-time">
             {timeAgo(post.createdAt)} · <VisibilityIcon visibility={post.visibility} />
           </span>
