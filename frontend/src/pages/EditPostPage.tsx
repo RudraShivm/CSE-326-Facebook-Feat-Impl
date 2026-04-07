@@ -77,6 +77,7 @@ export default function EditPostPage() {
     return null;
   }, [imageUrl, selectedFile, videoUrl]);
   const hasSharedReference = Boolean(post?.sharedPost || post?.sharedPostId || post?.sourcePostId);
+  const canEditMedia = !hasSharedReference;
 
   useEffect(() => {
     if (!postId) {
@@ -111,6 +112,10 @@ export default function EditPostPage() {
   }, [postId]);
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    if (!canEditMedia) {
+      return;
+    }
+
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -129,6 +134,10 @@ export default function EditPostPage() {
   };
 
   const handleRemoveMedia = () => {
+    if (!canEditMedia) {
+      return;
+    }
+
     setSelectedFile(null);
     setPreviewUrl(null);
     setImageUrl(null);
@@ -139,7 +148,11 @@ export default function EditPostPage() {
   const handleSave = async () => {
     if (!post) return;
 
-    const hasBody = Boolean(content.trim()) || Boolean(post.sharedPostId) || Boolean(post.sourcePostId) || Boolean(selectedFile) || Boolean(imageUrl) || Boolean(videoUrl);
+    const hasBody =
+      Boolean(content.trim()) ||
+      Boolean(post.sharedPostId) ||
+      Boolean(post.sourcePostId) ||
+      (canEditMedia && (Boolean(selectedFile) || Boolean(imageUrl) || Boolean(videoUrl)));
     if (!hasBody) {
       setError("Post must have text, media, or a shared post.");
       return;
@@ -149,10 +162,10 @@ export default function EditPostPage() {
     setError(null);
 
     try {
-      let nextImageUrl = imageUrl;
-      let nextVideoUrl = videoUrl;
+      let nextImageUrl = canEditMedia ? imageUrl : post.imageUrl;
+      let nextVideoUrl = canEditMedia ? videoUrl : post.videoUrl;
 
-      if (selectedFile) {
+      if (canEditMedia && selectedFile) {
         const uploadedUrl = await uploadMedia(selectedFile);
         if (selectedFile.type.startsWith("video/")) {
           nextVideoUrl = uploadedUrl;
@@ -388,35 +401,37 @@ export default function EditPostPage() {
                 </div>
               )}
 
-              <div className="edit-post-media-section">
-                {(previewUrl || imageUrl || videoUrl) && (
-                  <div className="create-post-media-preview">
-                    <button type="button" className="media-remove-btn" onClick={handleRemoveMedia}>
-                      <FiX size={16} />
-                    </button>
-                    {mediaKind === "video" ? (
-                      <AutoPlayVideo src={previewUrl || videoUrl || ""} />
-                    ) : (
-                      <img src={previewUrl || imageUrl || ""} alt="Post media preview" />
-                    )}
-                  </div>
-                )}
-                <div className="create-post-attachments edit-post-attachments">
-                  <span>{mediaKind ? "Replace the photo or video in this post" : "Add a photo or video to this post"}</span>
-                  <div className="attachment-actions">
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      hidden
-                      accept="image/*,video/*"
-                      onChange={handleFileChange}
-                    />
-                    <button type="button" onClick={() => fileInputRef.current?.click()} className="attach-btn" title="Add Photo/Video">
-                      <FiImage size={24} color="#45BD62" />
-                    </button>
+              {canEditMedia && (
+                <div className="edit-post-media-section">
+                  {(previewUrl || imageUrl || videoUrl) && (
+                    <div className="create-post-media-preview">
+                      <button type="button" className="media-remove-btn" onClick={handleRemoveMedia}>
+                        <FiX size={16} />
+                      </button>
+                      {mediaKind === "video" ? (
+                        <AutoPlayVideo src={previewUrl || videoUrl || ""} />
+                      ) : (
+                        <img src={previewUrl || imageUrl || ""} alt="Post media preview" />
+                      )}
+                    </div>
+                  )}
+                  <div className="create-post-attachments edit-post-attachments">
+                    <span>{mediaKind ? "Replace the photo or video in this post" : "Add a photo or video to this post"}</span>
+                    <div className="attachment-actions">
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        hidden
+                        accept="image/*,video/*"
+                        onChange={handleFileChange}
+                      />
+                      <button type="button" onClick={() => fileInputRef.current?.click()} className="attach-btn" title="Add Photo/Video">
+                        <FiImage size={24} color="#45BD62" />
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
 
             <div className="modal-actions edit-post-actions">

@@ -40,7 +40,6 @@ describe("PostCard missing shared post state", () => {
         isActive: true,
       })
     );
-    localStorage.setItem("accessToken", "token");
   });
 
   it("shows a placeholder card when the original shared post was deleted", () => {

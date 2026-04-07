@@ -1,13 +1,13 @@
 import request from "supertest";
 import app from "../app";
 
-let accessToken: string;
+const authorAgent = request.agent(app);
 let userId: string;
 let postId: string;
 
 // Setup: register a test user and get their token
 beforeAll(async () => {
-  const res = await request(app)
+  const res = await authorAgent
     .post("/api/v1/auth/register")
     .send({
       email: "post-test@example.com",
@@ -17,16 +17,14 @@ beforeAll(async () => {
       dateOfBirth: "1998-06-15",
     });
 
-  accessToken = res.body.accessToken;
   userId = res.body.user.userId;
 });
 
 // ── Create Post ───────────────────────────────────────────
 describe("POST /api/v1/posts", () => {
   it("should create a post", async () => {
-    const res = await request(app)
+    const res = await authorAgent
       .post("/api/v1/posts")
-      .set("Authorization", `Bearer ${accessToken}`)
       .send({
         content: "Hello, this is my first post!",
         visibility: "PUBLIC",
@@ -40,9 +38,8 @@ describe("POST /api/v1/posts", () => {
   });
 
   it("should reject empty content", async () => {
-    await request(app)
+    await authorAgent
       .post("/api/v1/posts")
-      .set("Authorization", `Bearer ${accessToken}`)
       .send({ content: "" })
       .expect(400);
   });
@@ -58,9 +55,8 @@ describe("POST /api/v1/posts", () => {
 // ── Get Post ──────────────────────────────────────────────
 describe("GET /api/v1/posts/:postId", () => {
   it("should return a post by ID", async () => {
-    const res = await request(app)
+    const res = await authorAgent
       .get(`/api/v1/posts/${postId}`)
-      .set("Authorization", `Bearer ${accessToken}`)
       .expect(200);
 
     expect(res.body.id).toBe(postId);
@@ -68,9 +64,8 @@ describe("GET /api/v1/posts/:postId", () => {
   });
 
   it("should return 404 for non-existent post", async () => {
-    await request(app)
+    await authorAgent
       .get("/api/v1/posts/nonexistent-id")
-      .set("Authorization", `Bearer ${accessToken}`)
       .expect(404);
   });
 });
@@ -78,9 +73,8 @@ describe("GET /api/v1/posts/:postId", () => {
 // ── Update Post ───────────────────────────────────────────
 describe("PATCH /api/v1/posts/:postId", () => {
   it("should update post content", async () => {
-    const res = await request(app)
+    const res = await authorAgent
       .patch(`/api/v1/posts/${postId}`)
-      .set("Authorization", `Bearer ${accessToken}`)
       .send({ content: "Updated content" })
       .expect(200);
 
@@ -88,9 +82,8 @@ describe("PATCH /api/v1/posts/:postId", () => {
   });
 
   it("should update visibility", async () => {
-    const res = await request(app)
+    const res = await authorAgent
       .patch(`/api/v1/posts/${postId}`)
-      .set("Authorization", `Bearer ${accessToken}`)
       .send({ visibility: "FRIENDS" })
       .expect(200);
 
@@ -98,8 +91,9 @@ describe("PATCH /api/v1/posts/:postId", () => {
   });
 
   it("should reject update from non-author", async () => {
+    const otherAgent = request.agent(app);
     // Register a different user
-    const otherRes = await request(app)
+    await otherAgent
       .post("/api/v1/auth/register")
       .send({
         email: "other-post@example.com",
@@ -109,9 +103,8 @@ describe("PATCH /api/v1/posts/:postId", () => {
         dateOfBirth: "1999-01-01",
       });
 
-    await request(app)
+    await otherAgent
       .patch(`/api/v1/posts/${postId}`)
-      .set("Authorization", `Bearer ${otherRes.body.accessToken}`)
       .send({ content: "Hijacked!" })
       .expect(403);
   });
@@ -120,9 +113,8 @@ describe("PATCH /api/v1/posts/:postId", () => {
 // ── Get User's Posts ──────────────────────────────────────
 describe("GET /api/v1/users/:userId/posts", () => {
   it("should return user's posts with pagination", async () => {
-    const res = await request(app)
+    const res = await authorAgent
       .get(`/api/v1/users/${userId}/posts?limit=5`)
-      .set("Authorization", `Bearer ${accessToken}`)
       .expect(200);
 
     expect(res.body).toHaveProperty("posts");
@@ -135,15 +127,13 @@ describe("GET /api/v1/users/:userId/posts", () => {
 // ── Delete Post ───────────────────────────────────────────
 describe("DELETE /api/v1/posts/:postId", () => {
   it("should delete a post", async () => {
-    await request(app)
+    await authorAgent
       .delete(`/api/v1/posts/${postId}`)
-      .set("Authorization", `Bearer ${accessToken}`)
       .expect(204);
 
     // Verify it's deleted
-    await request(app)
+    await authorAgent
       .get(`/api/v1/posts/${postId}`)
-      .set("Authorization", `Bearer ${accessToken}`)
       .expect(404);
   });
 });

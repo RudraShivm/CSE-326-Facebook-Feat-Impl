@@ -28,24 +28,22 @@ interface GlobalMenuProps {
 }
 
 export default function GlobalMenu({ isOpen, onClose, onCreatePost }: GlobalMenuProps) {
-  const { user, logout } = useAuth();
+  const { user, accounts, logout, switchAccount } = useAuth();
   const navigate = useNavigate();
   const [recentVisits, setRecentVisits] = useState<RecentVisitProfile[]>([]);
   const [shortcuts, setShortcuts] = useState<ShortcutItem[]>([]);
 
   const handleAddAccount = () => {
-    logout();
-    onClose();
-    navigate("/register");
-  };
-
-  const handleSignOut = () => {
-    logout();
     onClose();
     navigate("/login");
   };
 
-  // Lock body scroll when menu is open
+  const handleSignOut = async () => {
+    await logout();
+    onClose();
+    navigate("/login");
+  };
+
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
@@ -75,6 +73,8 @@ export default function GlobalMenu({ isOpen, onClose, onCreatePost }: GlobalMenu
 
   if (!isOpen) return null;
 
+  const otherAccounts = accounts.filter((account) => account.user.userId !== user?.userId);
+
   const openShortcut = (shortcut: ShortcutItem) => {
     onClose();
 
@@ -94,7 +94,6 @@ export default function GlobalMenu({ isOpen, onClose, onCreatePost }: GlobalMenu
   return (
     <div className="global-menu-overlay" onClick={onClose}>
       <div className="global-menu" onClick={(e) => e.stopPropagation()}>
-        {/* ── Menu Title ── */}
         <div className="global-menu-title-bar">
           <h2 className="global-menu-title">Global Menu</h2>
           <button className="menu-close-btn" onClick={onClose} aria-label="Close menu">
@@ -102,9 +101,7 @@ export default function GlobalMenu({ isOpen, onClose, onCreatePost }: GlobalMenu
           </button>
         </div>
 
-        {/* ── Scrollable Content ── */}
         <div className="global-menu-body">
-          {/* Recent Visits */}
           {recentVisits.length > 0 && (
             <section className="menu-section">
               <h3 className="menu-section-title">Recent Visits</h3>
@@ -150,7 +147,6 @@ export default function GlobalMenu({ isOpen, onClose, onCreatePost }: GlobalMenu
             </section>
           )}
 
-          {/* Create */}
           <section className="menu-section">
             <h3 className="menu-section-title">Create</h3>
             <button
@@ -170,7 +166,6 @@ export default function GlobalMenu({ isOpen, onClose, onCreatePost }: GlobalMenu
             </button>
           </section>
 
-          {/* Go to + Your Shortcuts (side by side on wider screens) */}
           <div className="menu-columns">
             <section className="menu-section">
               <h3 className="menu-section-title">Go to</h3>
@@ -253,7 +248,6 @@ export default function GlobalMenu({ isOpen, onClose, onCreatePost }: GlobalMenu
             </section>
           </div>
 
-          {/* Settings */}
           <section className="menu-section">
             <h3 className="menu-section-title">Settings</h3>
             <button
@@ -286,20 +280,33 @@ export default function GlobalMenu({ isOpen, onClose, onCreatePost }: GlobalMenu
             </button>
           </section>
 
-          {/* Account */}
           <section className="menu-section">
             <h3 className="menu-section-title">Account</h3>
             <button className="menu-item" onClick={handleAddAccount} id="menu-add-account">
               <FiUserPlus size={20} />
               <span>Add Account</span>
             </button>
-            <button className="menu-item menu-item-danger" onClick={handleSignOut} id="menu-sign-out">
+            {otherAccounts.map((account) => (
+              <button
+                key={account.sessionId}
+                className="menu-item"
+                onClick={async () => {
+                  await switchAccount(account.sessionId);
+                  onClose();
+                  navigate("/feed");
+                }}
+              >
+                <FiUser size={20} />
+                <span>
+                  Switch to {account.user.firstName} {account.user.lastName}
+                </span>
+              </button>
+            ))}
+            <button className="menu-item menu-item-danger" onClick={() => void handleSignOut()} id="menu-sign-out">
               <FiLogOut size={20} />
               <span>Sign Out</span>
             </button>
           </section>
-
-
         </div>
       </div>
     </div>

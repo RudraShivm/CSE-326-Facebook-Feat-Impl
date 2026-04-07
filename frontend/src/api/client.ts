@@ -1,5 +1,16 @@
 import axios from "axios";
 
+function isAuthBootstrapRequest(url?: string) {
+  return (
+    !!url &&
+    (url.includes("/auth/login") ||
+      url.includes("/auth/register") ||
+      url.includes("/auth/refresh") ||
+      url.includes("/auth/accounts") ||
+      url.includes("/auth/me"))
+  );
+}
+
 // Create a configured axios instance
 const apiClient = axios.create({
   // In development, Vite proxies /api to http://localhost:8080
@@ -8,23 +19,9 @@ const apiClient = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
+  withCredentials: true,
   timeout: 10000, // 10 seconds
 });
-
-// ─── REQUEST INTERCEPTOR ──────────────────────────────────
-// Runs BEFORE every request
-apiClient.interceptors.request.use(
-  (config) => {
-    // Get the auth token from localStorage
-    const token = localStorage.getItem("accessToken");
-    if (token) {
-      // Attach it as a Bearer token in the Authorization header
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
 
 // ─── RESPONSE INTERCEPTOR ─────────────────────────────────
 // Runs AFTER every response
@@ -40,15 +37,27 @@ apiClient.interceptors.response.use(
     if (
       error.response?.status === 401 &&
       !originalRequest._retry &&
-      !originalRequest.url?.includes("/auth/login")
+      !isAuthBootstrapRequest(originalRequest.url)
     ) {
       originalRequest._retry = true;
 
-      // Try to refresh the token (will be implemented in Diff 05)
-      // For now, redirect to login
-      localStorage.removeItem("accessToken");
-      localStorage.removeItem("refreshToken");
-      window.location.href = "/login";
+      try {
+        await apiClient.post("/auth/refresh");
+
+        return apiClient(originalRequest);
+      } catch (refreshError) {
+        localStorage.removeItem("user");
+
+        if (
+          typeof window !== "undefined" &&
+          window.location.pathname !== "/login" &&
+          window.location.pathname !== "/register"
+        ) {
+          window.location.href = "/login";
+        }
+
+        return Promise.reject(refreshError);
+      }
     }
 
     return Promise.reject(error);

@@ -1708,12 +1708,7 @@ img {
   color: var(--color-text-secondary);
   padding: var(--space-xs);
   border-radius: var(--radius-full);
-  opacity: 0;
   transition: all var(--transition-fast);
-}
-
-.shortcuts-list-item:hover .shortcuts-remove-btn {
-  opacity: 1;
 }
 
 .shortcuts-remove-btn:hover {

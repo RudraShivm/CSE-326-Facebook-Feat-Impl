@@ -1,22 +1,27 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import apiClient from "../api/client";
+import {
+  AuthUser,
+  RememberedAccount,
+  getCurrentUser,
+  getRememberedAccounts,
+  loginUser,
+  logoutCurrentSession,
+  registerUser,
+  switchAccountSession,
+} from "../api/auth";
 
 // ── Types ─────────────────────────────────────────────────
-interface User {
-  userId: string;
-  firstName: string;
-  lastName: string;
-  profilePicture: string | null;
-  isActive: boolean;
-}
+type User = AuthUser;
 
 interface AuthContextType {
   user: User | null;
+  accounts: RememberedAccount[];
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
+  switchAccount: (sessionId: string) => Promise<void>;
   updateUserContext: (data: Partial<User>) => void;
 }
 
@@ -34,65 +39,94 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 // ── Provider Component ────────────────────────────────────
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [accounts, setAccounts] = useState<RememberedAccount[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // On page load, check if there's a stored token
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
-    const accessToken = localStorage.getItem("accessToken");
-
-    if (storedUser && accessToken) {
+    if (storedUser) {
       try {
         setUser(JSON.parse(storedUser));
       } catch {
-        // Corrupted data — clear it
-        localStorage.clear();
+        localStorage.removeItem("user");
       }
     }
-    setIsLoading(false);
+
+    if (import.meta.env.MODE === "test") {
+      setIsLoading(false);
+      return;
+    }
+
+    void (async () => {
+      try {
+        const [rememberedAccounts, currentUser] = await Promise.all([
+          getRememberedAccounts(),
+          getCurrentUser(),
+        ]);
+        setAccounts(rememberedAccounts);
+        setUser(currentUser);
+        localStorage.setItem("user", JSON.stringify(currentUser));
+      } catch {
+        try {
+          const rememberedAccounts = await getRememberedAccounts();
+          setAccounts(rememberedAccounts);
+        } catch {
+          setAccounts([]);
+        }
+
+        setUser(null);
+        localStorage.removeItem("user");
+      } finally {
+        setIsLoading(false);
+      }
+    })();
   }, []);
 
   // ── Login ─────────────────────────────────────────────
   const login = async (email: string, password: string) => {
-    const response = await apiClient.post("/auth/login", { email, password });
-    const { accessToken, refreshToken, user: userData } = response.data;
-
-    // Store tokens and user in localStorage
-    localStorage.setItem("accessToken", accessToken);
-    localStorage.setItem("refreshToken", refreshToken);
-    localStorage.setItem("user", JSON.stringify(userData));
-
-    setUser(userData);
+    const response = await loginUser(email, password);
+    const rememberedAccounts = await getRememberedAccounts();
+    setAccounts(rememberedAccounts);
+    setUser(response.user);
+    localStorage.setItem("user", JSON.stringify(response.user));
   };
 
   // ── Register ──────────────────────────────────────────
   const register = async (data: RegisterData) => {
-    const response = await apiClient.post("/auth/register", data);
-    const { accessToken, refreshToken, user: userData } = response.data;
-
-    localStorage.setItem("accessToken", accessToken);
-    localStorage.setItem("refreshToken", refreshToken);
-    localStorage.setItem("user", JSON.stringify(userData));
-
-    setUser(userData);
+    const response = await registerUser(data);
+    const rememberedAccounts = await getRememberedAccounts();
+    setAccounts(rememberedAccounts);
+    setUser(response.user);
+    localStorage.setItem("user", JSON.stringify(response.user));
   };
 
   // ── Logout ────────────────────────────────────────────
-  const logout = () => {
-    // Call server logout (fire and forget)
-    apiClient.post("/auth/logout").catch(() => {});
-
-    // Clear local state
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("refreshToken");
-    localStorage.removeItem("user");
+  const logout = async () => {
+    await logoutCurrentSession().catch(() => {});
+    const rememberedAccounts = await getRememberedAccounts().catch(() => []);
+    setAccounts(rememberedAccounts);
     setUser(null);
+    localStorage.removeItem("user");
+  };
+
+  const switchAccount = async (sessionId: string) => {
+    const nextUser = await switchAccountSession(sessionId);
+    const rememberedAccounts = await getRememberedAccounts();
+    setAccounts(rememberedAccounts);
+    setUser(nextUser);
+    localStorage.setItem("user", JSON.stringify(nextUser));
   };
 
   const updateUserContext = (data: Partial<User>) => {
     setUser((prev) => {
       if (!prev) return prev;
       const updated = { ...prev, ...data };
+      const nextAccounts = accounts.map((account) =>
+        account.user.userId === updated.userId
+          ? { ...account, user: { ...account.user, ...data } }
+          : account
+      );
+      setAccounts(nextAccounts);
       localStorage.setItem("user", JSON.stringify(updated));
       return updated;
     });
@@ -100,11 +134,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const value: AuthContextType = {
     user,
+    accounts,
     isAuthenticated: !!user,
     isLoading,
     login,
     register,
     logout,
+    switchAccount,
     updateUserContext,
   };
 

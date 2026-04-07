@@ -118,6 +118,7 @@ export default function ShortcutsPage() {
     if (result.droppedShortcut) {
       showToast("Only 4 shortcuts are allowed. Removed the oldest shortcut.", "info");
     }
+
     setCustomTitle("");
     setCustomUrl("");
     setCustomIcon("🔗");
@@ -199,18 +200,16 @@ export default function ShortcutsPage() {
 
   return (
     <div className="shortcuts-page">
-      {/* ── Header ── */}
       <header className="feed-header">
         <h1 className="logo logo-small" onClick={() => navigate("/feed")} style={{ cursor: "pointer" }}>Facebook</h1>
         <div className="feed-header-right">
           <button className="header-icon-btn" onClick={() => navigate("/search")}><FiSearch size={20} /></button>
           <button className="header-icon-btn" onClick={() => navigate("/notifications")} aria-label="Notifications">
-             <FiBell size={20} />
+            <FiBell size={20} />
           </button>
         </div>
       </header>
 
-      {/* ── Search People ── */}
       <section className="shortcuts-section">
         <h3 className="shortcuts-section-title">Search Person</h3>
         <div className="shortcuts-search-wrap">
@@ -247,7 +246,9 @@ export default function ShortcutsPage() {
                   )}
                 </div>
                 <div className="search-user-info">
-                  <span className="search-user-name">{person.firstName} {person.lastName}</span>
+                  <span className="search-user-name">
+                    {person.firstName} {person.lastName}
+                  </span>
                   {person.bio && (
                     <span className="search-user-bio">
                       {person.bio.slice(0, 60)}
@@ -266,7 +267,6 @@ export default function ShortcutsPage() {
         )}
       </section>
 
-      {/* ── Add Custom URL ── */}
       <section className="shortcuts-section">
         <div className="shortcuts-section-header">
           <h3 className="shortcuts-section-title">Custom Shortcut</h3>
@@ -335,7 +335,6 @@ export default function ShortcutsPage() {
         )}
       </section>
 
-      {/* ── Current Shortcuts ── */}
       <section className="shortcuts-section">
         <h3 className="shortcuts-section-title">
           Your Shortcuts ({shortcuts.length})
@@ -386,7 +385,6 @@ export default function ShortcutsPage() {
         )}
       </section>
 
-      {/* ── FAB — Custom "F" button ── */}
       <button
         className="fab fab-f"
         onClick={() => setShowGlobalMenu(true)}

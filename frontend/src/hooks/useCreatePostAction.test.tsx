@@ -28,8 +28,6 @@ describe("useCreatePostAction", () => {
         isActive: true,
       })
     );
-    localStorage.setItem("accessToken", "token");
-
     render(
       <AuthProvider>
         <AppToastProvider>

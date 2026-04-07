@@ -2,12 +2,11 @@ import prisma from "../config/database";
 import { hashPassword, comparePassword } from "../utils/password";
 import {
   generateAccessToken,
-  generateRefreshToken,
-  verifyRefreshToken,
   TokenPayload,
 } from "../utils/jwt";
 import { AppError } from "../middleware/error.middleware";
 import redis from "../config/redis";
+import type { SessionUserSnapshot } from "./session.service";
 
 
 // ── Types ─────────────────────────────────────────────────
@@ -26,7 +25,6 @@ interface LoginInput {
 
 interface AuthResponse {
   accessToken: string;
-  refreshToken: string;
   expiresIn: number;  // seconds
   user: {
     userId: string;
@@ -35,6 +33,11 @@ interface AuthResponse {
     profilePicture: string | null;
     isActive: boolean;
   };
+}
+
+export interface PublicAuthResponse {
+  expiresIn: number;
+  user: AuthResponse["user"];
 }
 
 // ── Register ──────────────────────────────────────────────
@@ -69,11 +72,9 @@ export async function registerUser(input: RegisterInput): Promise<AuthResponse> 
   // Generate tokens
   const tokenPayload: TokenPayload = { userId: user.id, email: user.email };
   const accessToken = generateAccessToken(tokenPayload);
-  const refreshToken = generateRefreshToken(tokenPayload);
 
   return {
     accessToken,
-    refreshToken,
     expiresIn: 900, // 15 minutes in seconds
     user: {
       userId: user.id,
@@ -102,11 +103,9 @@ export async function loginUser(input: LoginInput): Promise<AuthResponse> {
 
   const tokenPayload: TokenPayload = { userId: user.id, email: user.email };
   const accessToken = generateAccessToken(tokenPayload);
-  const refreshToken = generateRefreshToken(tokenPayload);
 
   return {
     accessToken,
-    refreshToken,
     expiresIn: 900,
     user: {
       userId: user.id,
@@ -118,26 +117,33 @@ export async function loginUser(input: LoginInput): Promise<AuthResponse> {
   };
 }
 
-// ── Refresh Token ─────────────────────────────────────────
-export async function refreshAccessToken(refreshTokenStr: string): Promise<{ accessToken: string; expiresIn: number }> {
-  // Check if token is locally blacklisted in Redis (from logout)
-  const isBlacklisted = await redis.get(`bl_token:${refreshTokenStr}`);
-  if (isBlacklisted) {
-    throw new AppError("Refresh token has been revoked.", 401, "UNAUTHORIZED");
-  }
+export function buildSessionUserSnapshot(resultUser: AuthResponse["user"], email: string): SessionUserSnapshot {
+  return {
+    ...resultUser,
+    email,
+  };
+}
 
-  const payload = verifyRefreshToken(refreshTokenStr);
-  const newAccessToken = generateAccessToken({ userId: payload.userId, email: payload.email });
+export function toPublicAuthResponse(result: AuthResponse): PublicAuthResponse {
+  return {
+    expiresIn: result.expiresIn,
+    user: result.user,
+  };
+}
+
+// ── Refresh Token / Session Refresh ───────────────────────
+export async function refreshAccessToken(user: SessionUserSnapshot): Promise<{ accessToken: string; expiresIn: number }> {
+  const newAccessToken = generateAccessToken({ userId: user.userId, email: user.email });
   return { accessToken: newAccessToken, expiresIn: 900 };
 }
 
 // ── Logout ────────────────────────────────────────────────
-export async function logoutUser(accessToken: string) {
+export async function logoutUser(accessToken?: string | null) {
   // Blacklist the access token for its remaining lifetime
   // (Assuming typical 15 min expiry, we'll cache it for 15 mins to be safe)
-  const TTL = 15 * 60; // 15 minutes
+  const accessTokenTTL = 15 * 60; // 15 minutes
 
   if (accessToken) {
-    await redis.set(`bl_token:${accessToken}`, "revoked", "EX", TTL);
+    await redis.set(`bl_token:${accessToken}`, "revoked", "EX", accessTokenTTL);
   }
 }
