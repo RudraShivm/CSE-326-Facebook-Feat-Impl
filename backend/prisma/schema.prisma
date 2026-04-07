@@ -46,6 +46,13 @@ enum ReactionType {
   @@map("reaction_type")
 }
 
+enum ShortcutKind {
+  PROFILE
+  LINK
+
+  @@map("shortcut_kind")
+}
+
 // ─────────────────────────────────────────────
 // User Model
 // Reference: Class Diagram — "User" class
@@ -99,8 +106,48 @@ model User {
   blockedBy     BlockedUser[] @relation("blocked")
   notifications      Notification[] @relation("notifications")
   notificationActors Notification[] @relation("notificationActor")
+  recentVisits       RecentProfileVisit[] @relation("RecentVisitsOwner")
+  visitedByUsers     RecentProfileVisit[] @relation("RecentVisitsProfile")
+  shortcuts          UserShortcut[]       @relation("UserShortcutsOwner")
+  shortcutProfiles   UserShortcut[]       @relation("UserShortcutProfile")
 
   @@map("users") // Table name in PostgreSQL
+}
+
+model RecentProfileVisit {
+  id               String   @id @default(uuid()) @map("recent_visit_id")
+  userId           String   @map("user_id")
+  visitedProfileId String   @map("visited_profile_id")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  user           User @relation("RecentVisitsOwner", fields: [userId], references: [id], onDelete: Cascade)
+  visitedProfile User @relation("RecentVisitsProfile", fields: [visitedProfileId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, visitedProfileId])
+  @@index([userId])
+  @@index([visitedProfileId])
+  @@map("recent_profile_visits")
+}
+
+model UserShortcut {
+  id            String       @id @default(uuid()) @map("shortcut_id")
+  userId        String       @map("user_id")
+  kind          ShortcutKind
+  title         String
+  url           String
+  icon          String
+  profileUserId String?      @map("profile_user_id")
+  subtitle      String?
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+
+  user        User  @relation("UserShortcutsOwner", fields: [userId], references: [id], onDelete: Cascade)
+  profileUser User? @relation("UserShortcutProfile", fields: [profileUserId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([profileUserId])
+  @@map("user_shortcuts")
 }
 
 // ─────────────────────────────────────────────

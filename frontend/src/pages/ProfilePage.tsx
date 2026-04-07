@@ -4,11 +4,13 @@ import { useAuth } from "../contexts/AuthContext";
 import { getProfile, getUserPosts, UserProfile, updateProfile } from "../api/users";
 import { getApiErrorMessage } from "../api/error";
 import { uploadMedia } from "../api/storage";
+import { recordRecentVisitForUser } from "../api/menu";
 import { Post } from "../api/posts";
 import PostCard from "../components/PostCard";
 import GlobalMenu from "../components/GlobalMenu";
 import { useCreatePostAction } from "../hooks/useCreatePostAction";
 import { useAppToast } from "../contexts/AppToastContext";
+import { getShortcuts, hydrateMenuStorage, recordRecentVisit } from "../utils/globalMenuStorage";
 import {
   FiSearch,
   FiBell,
@@ -79,6 +81,36 @@ export default function ProfilePage() {
     fetchProfile();
     fetchPosts();
   }, [fetchProfile, fetchPosts]);
+
+  useEffect(() => {
+    if (!profile) {
+      return;
+    }
+
+    const optimisticRecentVisits = recordRecentVisit(
+      {
+        id: profile.id,
+        firstName: profile.firstName,
+        lastName: profile.lastName,
+        profilePicture: profile.profilePicture,
+        bio: profile.bio,
+      },
+      user?.userId
+    );
+
+    if (!user?.userId || profile.id === user.userId) {
+      return;
+    }
+
+    void recordRecentVisitForUser(user.userId, profile.id)
+      .then((result) => {
+        hydrateMenuStorage(result.recentVisits, result.shortcuts);
+      })
+      .catch((err) => {
+        console.error("Failed to persist recent visit:", err);
+        hydrateMenuStorage(optimisticRecentVisits, getShortcuts());
+      });
+  }, [profile, user?.userId]);
 
   // ── Image upload handlers ──
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {

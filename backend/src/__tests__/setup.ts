@@ -14,6 +14,8 @@ const prisma = new PrismaClient();
 // Clean all tables before the test suite runs
 beforeAll(async () => {
   // Delete in reverse dependency order (foreign key constraints)
+  await prisma.userShortcut.deleteMany();
+  await prisma.recentProfileVisit.deleteMany();
   await prisma.notification.deleteMany();
   await prisma.savedPost.deleteMany();
   await prisma.blockedUser.deleteMany();
@@ -25,6 +27,8 @@ beforeAll(async () => {
 
 // Disconnect after all tests complete
 afterAll(async () => {
+  await prisma.userShortcut.deleteMany();
+  await prisma.recentProfileVisit.deleteMany();
   await prisma.notification.deleteMany();
   await prisma.savedPost.deleteMany();
   await prisma.blockedUser.deleteMany();

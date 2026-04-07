@@ -85,3 +85,49 @@ export async function getBlockedUsers(req: Request, res: Response, next: NextFun
     next(error);
   }
 }
+
+// ── Menu Preferences ──────────────────────────────────────
+export async function getMenuPreferencesHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const result = await userService.getMenuPreferences(req.user!.userId, req.params.userId as string);
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function recordRecentVisitHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { profileId } = req.body;
+    const result = await userService.recordRecentVisitForUser(
+      req.user!.userId,
+      req.params.userId as string,
+      profileId as string
+    );
+    res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function addShortcutHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const result = await userService.addShortcutForUser(req.user!.userId, req.params.userId as string, req.body);
+    res.status(201).json(result);
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function removeShortcutHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const result = await userService.removeShortcutForUser(
+      req.user!.userId,
+      req.params.userId as string,
+      req.params.shortcutId as string
+    );
+    res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+}
