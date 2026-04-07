@@ -6,6 +6,9 @@ import { AppError } from "../middleware/error.middleware";
 const commentSchema = z.object({
   content: z.string().min(1, "Comment cannot be empty").max(2000),
 });
+const replySchema = z.object({
+  content: z.string().min(1, "Reply cannot be empty").max(2000),
+});
 
 export async function addComment(req: Request, res: Response, next: NextFunction) {
   try {
@@ -25,12 +28,48 @@ export async function addComment(req: Request, res: Response, next: NextFunction
   }
 }
 
+export async function addReply(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { content } = replySchema.parse(req.body);
+    const reply = await commentService.createComment(
+      req.params.postId as string,
+      req.user!.userId,
+      content,
+      req.params.commentId as string // parentId
+    );
+    res.status(201).json(reply);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      next(new AppError(error.errors[0].message, 400, "VALIDATION_ERROR"));
+    } else {
+      next(error);
+    }
+  }
+}
+
 export async function getComments(req: Request, res: Response, next: NextFunction) {
   try {
     const cursor = req.query.cursor as string | undefined;
     const limit = Math.min(parseInt(req.query.limit as string) || 5, 50);
     const userId = req.user?.userId;
     const result = await commentService.getComments(req.params.postId as string, cursor, limit, userId);
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function getReplies(req: Request, res: Response, next: NextFunction) {
+  try {
+    const cursor = req.query.cursor as string | undefined;
+    const limit = Math.min(parseInt(req.query.limit as string) || 5, 20);
+    const userId = req.user?.userId;
+    const result = await commentService.getReplies(
+      req.params.commentId as string,
+      cursor,
+      limit,
+      userId
+    );
     res.json(result);
   } catch (error) {
     next(error);

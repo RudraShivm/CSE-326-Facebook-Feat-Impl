@@ -10,4 +10,7 @@ router.post("/", authenticate, commentCtrl.addComment);
 router.patch("/:commentId", authenticate, commentCtrl.editComment);
 router.delete("/:commentId", authenticate, commentCtrl.removeComment);
 
+
+router.get("/:commentId/replies", authenticate, commentCtrl.getReplies);
+router.post("/:commentId/replies", authenticate, commentCtrl.addReply);
 export default router;

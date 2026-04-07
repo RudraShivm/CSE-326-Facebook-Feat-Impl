@@ -2,7 +2,13 @@ import prisma from "../config/database";
 import { AppError } from "../middleware/error.middleware";
 import { createNotification } from "./notification.service";
 
-// Extract comment mapping to dynamic function
+const authorSelect = {
+  id: true,
+  firstName: true,
+  lastName: true,
+  profilePicture: true,
+};
+
 export const getCommentSelect = (userId?: string) => ({
   id: true,
   content: true,
@@ -10,34 +16,102 @@ export const getCommentSelect = (userId?: string) => ({
   updatedAt: true,
   authorId: true,
   postId: true,
-  author: {
-    select: {
-      id: true,
-      firstName: true,
-      lastName: true,
-      profilePicture: true,
-    },
-  },
+  parentId: true,
+  author: { select: authorSelect },
   _count: {
     select: {
       reactions: true,
+      replies: true,
     },
   },
-  ...(userId ? {
-    reactions: {
-      where: { userId },
-      select: { id: true },
-    }
-  } : {}),
+  ...(userId
+    ? {
+        reactions: {
+          where: { userId },
+          select: { id: true },
+        },
+      }
+    : {}),
 });
 
-// ── Create Comment ────────────────────────────────────────
-export async function createComment(postId: string, userId: string, content: string) {
+// Reply select — same but no further nesting
+const getReplySelect = (userId?: string) => ({
+  id: true,
+  content: true,
+  createdAt: true,
+  updatedAt: true,
+  authorId: true,
+  postId: true,
+  parentId: true,
+  author: { select: authorSelect },
+  _count: { select: { reactions: true, replies: true } },
+  ...(userId
+    ? {
+        reactions: {
+          where: { userId },
+          select: { id: true },
+        },
+      }
+    : {}),
+});
+
+// Helper to map raw Prisma result → comment/reply DTO
+function mapComment(c: any) {
+  const { reactions, ...rest } = c;
+  return {
+    ...rest,
+    hasReacted: reactions ? reactions.length > 0 : false,
+  };
+}
+
+// ── Create Comment (or Reply) ──────────────────────────────
+export async function createComment(
+  postId: string,
+  userId: string,
+  content: string,
+  parentId?: string
+) {
   // Verify the post exists
   const post = await prisma.post.findUnique({ where: { id: postId } });
   if (!post) throw new AppError("Post not found.", 404, "NOT_FOUND");
 
-  // Create comment and increment commentCount atomically
+  // If this is a reply, validate the parent
+  if (parentId) {
+    const parent = await prisma.comment.findUnique({
+      where: { id: parentId },
+      select: { postId: true, authorId: true },
+    });
+    if (!parent) throw new AppError("Parent comment not found.", 404, "NOT_FOUND");
+    if (parent.postId !== postId)
+      throw new AppError("Parent comment does not belong to this post.", 400, "BAD_REQUEST");
+
+    // Create reply (no post counter bump)
+    const reply = await prisma.comment.create({
+      data: { content, authorId: userId, postId, parentId },
+      select: getReplySelect(userId),
+    });
+
+    // Notify the parent comment's author (reuse parent from above)
+    if (parent.authorId !== userId) {
+      const actor = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { firstName: true, lastName: true },
+      });
+      if (actor) {
+        await createNotification(
+          parent.authorId,
+          userId,
+          "COMMENT_REPLY",
+          parentId,
+          `${actor.firstName} ${actor.lastName} replied to your comment.`
+        );
+      }
+    }
+
+    return mapComment(reply);
+  }
+
+  // Top-level comment + post counter bump (atomic)
   const [comment] = await prisma.$transaction([
     prisma.comment.create({
       data: { content, authorId: userId, postId },
@@ -49,9 +123,11 @@ export async function createComment(postId: string, userId: string, content: str
     }),
   ]);
 
-  // Notify the post author (unless they're commenting on their own post)
   if (post.authorId !== userId) {
-    const actor = await prisma.user.findUnique({ where: { id: userId }, select: { firstName: true, lastName: true } });
+    const actor = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { firstName: true, lastName: true },
+    });
     if (actor) {
       await createNotification(
         post.authorId,
@@ -63,10 +139,9 @@ export async function createComment(postId: string, userId: string, content: str
     }
   }
 
-  return comment;
+  return mapComment(comment);
 }
 
-// ── Get Comments for Post ─────────────────────────────────
 export async function getComments(
   postId: string,
   cursor?: string,
@@ -74,9 +149,9 @@ export async function getComments(
   userId?: string
 ) {
   const comments = await prisma.comment.findMany({
-    where: { postId },
+    where: { postId, parentId: null }, // top-level only
     select: getCommentSelect(userId),
-    orderBy: { createdAt: "asc" }, // Oldest first, like Facebook
+    orderBy: { createdAt: "asc" },
     take: limit + 1,
     ...(cursor && { cursor: { id: cursor }, skip: 1 }),
   });
@@ -85,10 +160,9 @@ export async function getComments(
   const items = hasMore ? comments.slice(0, limit) : comments;
 
   const mappedItems = items.map((c: any) => {
-    const { reactions, ...rest } = c;
     return {
-      ...rest,
-      hasReacted: reactions ? reactions.length > 0 : false,
+      ...mapComment(c),
+      replies: [], // No replies initially to match "View replies" request
     };
   });
 
@@ -99,7 +173,31 @@ export async function getComments(
   };
 }
 
-// ── Update Comment ────────────────────────────────────────
+export async function getReplies(
+  commentId: string,
+  cursor?: string,
+  limit: number = 5,
+  userId?: string
+) {
+  const replies = await prisma.comment.findMany({
+    where: { parentId: commentId },
+    orderBy: { createdAt: "asc" },
+    select: getCommentSelect(userId), // Use CommentSelect for recursive counts
+    take: limit + 1,
+    ...(cursor && { cursor: { id: cursor }, skip: 1 }),
+  });
+
+  const hasMore = replies.length > limit;
+  const items = hasMore ? replies.slice(0, limit) : replies;
+  const mappedItems = items.map(mapComment);
+
+  return {
+    replies: mappedItems,
+    nextCursor: hasMore ? mappedItems[mappedItems.length - 1].id : null,
+    hasMore,
+  };
+}
+
 export async function updateComment(commentId: string, userId: string, content: string) {
   const comment = await prisma.comment.findUnique({
     where: { id: commentId },
@@ -111,18 +209,19 @@ export async function updateComment(commentId: string, userId: string, content: 
     throw new AppError("You can only edit your own comments.", 403, "FORBIDDEN");
   }
 
-  return prisma.comment.update({
+  const updated = await prisma.comment.update({
     where: { id: commentId },
     data: { content },
     select: getCommentSelect(userId),
   });
+
+  return mapComment(updated);
 }
 
-// ── Delete Comment ────────────────────────────────────────
 export async function deleteComment(commentId: string, userId: string) {
   const comment = await prisma.comment.findUnique({
     where: { id: commentId },
-    select: { authorId: true, postId: true },
+    select: { authorId: true, postId: true, parentId: true },
   });
 
   if (!comment) throw new AppError("Comment not found.", 404, "NOT_FOUND");
@@ -130,11 +229,17 @@ export async function deleteComment(commentId: string, userId: string) {
     throw new AppError("You can only delete your own comments.", 403, "FORBIDDEN");
   }
 
-  await prisma.$transaction([
-    prisma.comment.delete({ where: { id: commentId } }),
-    prisma.post.update({
-      where: { id: comment.postId },
-      data: { commentCount: { decrement: 1 } },
-    }),
-  ]);
+  if (comment.parentId) {
+    // It's a reply — just delete it, no post counter change
+    await prisma.comment.delete({ where: { id: commentId } });
+  } else {
+    // Top-level comment — cascade deletes replies via FK, and decrement post counter
+    await prisma.$transaction([
+      prisma.comment.delete({ where: { id: commentId } }),
+      prisma.post.update({
+        where: { id: comment.postId },
+        data: { commentCount: { decrement: 1 } },
+      }),
+    ]);
+  }
 }
